@@ -2,7 +2,8 @@
 
 An Omarchy screensaver for when music is playing: the album art redrawn as
 coloured text — braille halftone out of the box, ASCII or blocks a setting
-away — a mirrored spectrum of whatever is actually coming out of the speakers,
+away, or the shell's own panel language if you would rather it looked like the
+desktop — a spectrum of whatever is actually coming out of the speakers,
 painted in the cover's own colours, and the track it belongs to.
 
 Idle with nothing playing and Omarchy's own screensaver still takes over. This
@@ -13,14 +14,7 @@ yourself.
 ![kind](https://img.shields.io/badge/omarchy-plugin-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 <p align="center">
-  <img src="docs/dots-cover.png" width="31%" alt="dots style, spectrum in the cover's colours">
-  <img src="docs/ascii-theme.png" width="31%" alt="ascii style, spectrum in the theme's palette">
-  <img src="docs/blocks-theme.png" width="31%" alt="blocks style, spectrum in the theme's palette">
-</p>
-<p align="center">
-  <em>the three style presets:
-  <code>dots</code> (with <code>colors: cover</code>) &nbsp;·&nbsp;
-  <code>ascii</code> &nbsp;·&nbsp; <code>blocks</code></em>
+  <img src="preview.png" width="78%" alt="the four style presets, one track, side by side">
 </p>
 
 ---
@@ -218,6 +212,15 @@ times as densely and turned into a one-bit image — Floyd–Steinberg dithered,
 its own contrast range opened out first, then coloured per cell from the dots
 that are actually lit. A newspaper halftone, in a terminal.
 
+<p align="center">
+  <img src="docs/dots-cover.png" width="31%" alt="dots: braille halftone, spectrum in the cover's colours">
+  <img src="docs/ascii-theme.png" width="31%" alt="ascii: the letter ramp">
+  <img src="docs/blocks-theme.png" width="31%" alt="blocks: the shaded block ramp">
+</p>
+<p align="center">
+  <em><code>dots</code> &nbsp;·&nbsp; <code>ascii</code> &nbsp;·&nbsp; <code>blocks</code></em>
+</p>
+
 **`system`** speaks no alphabet at all. It borrows the shell's own popup
 language — the way the audio, network and bluetooth panels are drawn — and puts
 the same card on screen at screensaver size: a `BorderSurface` over the
@@ -258,7 +261,7 @@ alphabet too — `spectrum: auto` means `bars` under `blocks` and `ascii` under
 | `density` | `. , : ; = + * #` | the other ASCII tradition: weight of ink, not position. Reads as a heat map |
 | `wave` | `_ / \ \|` | a contour tracing the top of the spectrum, risers drawn in so the line never breaks — an oscilloscope rather than a bar chart |
 | `dots` | `⣀⣤⣶⣿` / `⠉⠛⠿⣿` | braille packs four rows into a cell, the trick btop and gotop use for graphs smoother than the terminal grid allows. Reads as an LED equaliser |
-| `native` | rounded rectangles | not text at all: QML primitives with the shell's own easing, for the `system` style. Cheapest of the six, since nothing has to be laid out as rich text |
+| `native` | rectangles, cut into segments | not text at all: QML primitives with the shell's own easing, for the `system` style. Corners follow `Style.cornerRadius`, so they are as square as the rest of the desktop. Cheapest of the six, since nothing has to be laid out as rich text |
 
 Both are watched live — edit `shell.json` and the screen is redrawn without a
 restart.
