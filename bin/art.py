@@ -6,8 +6,10 @@ read off disk, not a download), scales it with ffmpeg, and prints one HTML line
 per character row: each cell a span coloured like the pixel it stands for, with
 a character picked by how bright that pixel is.
 
-Terminal cells are about twice as tall as they are wide, so the vertical
-sampling is halved to keep the picture square.
+A character cell is about twice as tall as it is wide, so the vertical sampling
+is halved -- but only after the source's own shape is taken into account. Covers
+are not always square: YouTube Music hands out video thumbnails at 16:9, and
+assuming a square there squashes them.
 
 Usage: art.py <path-or-url> [cols]
 """
@@ -17,6 +19,25 @@ import sys
 
 # Dark to light. Denser glyphs read as brighter areas once they are coloured.
 RAMP = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
+
+
+# How much taller a character cell is than it is wide. Close enough across the
+# monospace families a terminal-styled shell is likely to be using.
+CELL_ASPECT = 2.0
+
+
+def source_shape(path):
+    """Width and height of the image, or None if ffprobe cannot say."""
+    cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0",
+           "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", path]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=10).stdout.strip()
+        width, height = (int(v) for v in out.split("x")[:2])
+        if width > 0 and height > 0:
+            return width, height
+    except Exception:
+        pass
+    return None
 
 
 def sample(path, cols, rows):
@@ -42,7 +63,13 @@ def main():
     if path.startswith("file://"):
         path = path[7:]
     cols = int(sys.argv[2]) if len(sys.argv) > 2 else 44
-    rows = max(1, cols // 2)
+
+    shape = source_shape(path)
+    if shape:
+        width, height = shape
+        rows = max(1, round(cols * (height / width) / CELL_ASPECT))
+    else:
+        rows = max(1, round(cols / CELL_ASPECT))
 
     pixels = sample(path, cols, rows)
     if pixels is None:

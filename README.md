@@ -38,9 +38,10 @@ Omarchy install already has.
 **Album art as coloured ASCII.** Players cache the cover on disk and point MPRIS
 at it, so this reads a local file rather than the network. `ffmpeg` scales it,
 and each cell gets a character chosen from a 70-step ramp by luminance, coloured
-like the pixel it stands for. Vertical sampling is halved because a character
-cell is about twice as tall as it is wide — without that the cover comes out
-stretched.
+like the pixel it stands for. The height is worked out from the source's own
+proportions and then halved, because a character cell is about twice as tall as
+it is wide — covers are not always square, and YouTube Music in particular hands
+out 16:9 video thumbnails that a square assumption squashes.
 
 **A mirrored spectrum**, in block glyphs, growing up and down from a centre
 line, coloured across the theme's own terminal palette -- cool in the bass,
