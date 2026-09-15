@@ -14,10 +14,10 @@
   },
   "settings": {
     "defaults": {
-      "style": "ascii",
-      "artWidth": 72,
+      "style": "dots",
       "spectrum": "auto",
-      "colors": "theme"
+      "colors": "cover",
+      "artWidth": 72
     },
     "schema": [
       {
@@ -28,7 +28,7 @@
           "blocks",
           "dots"
         ],
-        "default": "ascii",
+        "default": "dots",
         "label": "Style preset",
         "description": "ascii draws the cover with a 70-glyph letter ramp, blocks with shaded block characters, dots with dithered braille."
       },
@@ -55,7 +55,7 @@
           "accent",
           "cover"
         ],
-        "default": "theme",
+        "default": "cover",
         "label": "Spectrum colours",
         "description": "theme spreads the spectrum across the theme's terminal palette, accent paints it in one colour, cover pulls bright distinct colours out of the album art."
       },

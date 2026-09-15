@@ -134,16 +134,22 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 {
   "version": 1,
   "plugins": [
-    { "id": "mrhogun.music-saver", "style": "ascii", "artWidth": 72 }
+    {
+      "id": "mrhogun.music-saver",
+      "style": "dots",
+      "spectrum": "auto",
+      "colors": "cover",
+      "artWidth": 72
+    }
   ]
 }
 ```
 
 | Key | Values | Default | What it does |
 |---|---|---|---|
-| `style` | `ascii`, `blocks`, `dots` | `ascii` | which alphabet draws the cover |
+| `style` | `ascii`, `blocks`, `dots` | `dots` | which alphabet draws the cover |
 | `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots` | `auto` | how the spectrum is drawn |
-| `colors` | `theme`, `accent`, `cover` | `theme` | where the spectrum takes its colour from |
+| `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 
 **`ascii`** draws the cover with the classic 70-glyph density ramp

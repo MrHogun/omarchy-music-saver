@@ -72,7 +72,7 @@ Scope {
   readonly property var styles: ["ascii", "blocks", "dots"]
   readonly property string style: {
     const want = String(root.settings.style || "")
-    return root.styles.indexOf(want) !== -1 ? want : "ascii"
+    return root.styles.indexOf(want) !== -1 ? want : "dots"
   }
   // Where the spectrum takes its colour from.
   //   theme  -- the theme's own terminal palette, spread across the spectrum
@@ -81,7 +81,7 @@ Scope {
   readonly property var colorSources: ["theme", "accent", "cover"]
   readonly property string colorSource: {
     const want = String(root.settings.colors || "")
-    return root.colorSources.indexOf(want) !== -1 ? want : "theme"
+    return root.colorSources.indexOf(want) !== -1 ? want : "cover"
   }
 
   readonly property int artWidth: {
