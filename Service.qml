@@ -74,15 +74,43 @@ Scope {
   property var peaks: new Array(32).fill(0)
   property real overallLevel: 0
 
-  // Drawn the way terminal visualisers draw: monospace blocks, a spectrum
-  // mirrored about its centre line, and a peak marker per column that falls
-  // slowly behind the music -- the trick cli-visualizer calls falloff, and the
-  // thing that makes a spectrum read as rhythm rather than noise.
-  readonly property var blocks: [" ", "\u2581", "\u2582", "\u2583", "\u2584",
-                                 "\u2585", "\u2586", "\u2587", "\u2588"]
-  readonly property string peakUp: "\u2594"    // upper one eighth block
-  readonly property string peakDown: "\u2581"  // lower one eighth block
+  // Drawn the way terminal visualisers draw: a spectrum mirrored about its
+  // centre line and a peak marker per column that falls slowly behind the music
+  // -- the trick cli-visualizer calls falloff, and the thing that makes a
+  // spectrum read as rhythm rather than noise.
+  //
+  // Which glyphs do the drawing follows the style preset, so the whole screen
+  // speaks one alphabet. The block ramp fills a cell from the bottom in eighths,
+  // which is the smooth bar everyone knows. The ascii ramp cannot move within
+  // the cell, so it says the same thing the way ASCII art has always said it:
+  // by density, each step heavier than the last.
+  readonly property var rampBlocks: [" ", "\u2581", "\u2582", "\u2583", "\u2584",
+                                     "\u2585", "\u2586", "\u2587", "\u2588"]
+
+  // The block ramp fills a cell from the bottom in eighths. ASCII cannot move
+  // ink within a cell -- but it can choose a glyph whose ink already sits where
+  // the fill would be, which is the same trick aalib plays on a whole image.
+  // So the upper half climbs from glyphs that rest on the baseline to ones that
+  // stand full height, and the reflection hangs from the top of its cell
+  // instead. A full cell is a bar, so it gets the one glyph that is a bar.
+  readonly property var rampAsciiUp: [" ", "_", ".", ",", ":", ";", "i", "|", "|"]
+  readonly property var rampAsciiDown: [" ", "'", "\"", "^", ":", ";", "!", "|", "|"]
+
+  function rampFor(lower) {
+    if (root.style !== "ascii")
+      return root.rampBlocks
+    return lower ? root.rampAsciiDown : root.rampAsciiUp
+  }
+
+  // The falloff marker rides above the bar, so it wants a glyph that sits high
+  // in its cell; its reflection wants one that sits low.
+  readonly property string peakUp: root.style === "ascii" ? "-" : "\u2594"
+  readonly property string peakDown: root.style === "ascii" ? "_" : "\u2581"
   readonly property real peakFall: 0.012
+
+  // A preset change has to redraw the current frame, not wait for the next one:
+  // the analyser only runs while the saver is up.
+  onStyleChanged: root.frame = root.render()
 
   readonly property int bandCount: 4
 
@@ -113,11 +141,12 @@ Scope {
       (lower ? 0.38 : 1.0) * (1.0 - 0.2 * reach))
   }
 
-  function glyphFor(cell) {
+  function glyphFor(cell, lower) {
+    const ramp = root.rampFor(lower)
     if (cell >= 1)
-      return blocks[8]
+      return ramp[8]
     if (cell > 0)
-      return blocks[Math.max(1, Math.round(cell * 8))]
+      return ramp[Math.max(1, Math.round(cell * 8))]
     return " "
   }
 
@@ -133,7 +162,7 @@ Scope {
         const level = (root.levels[col] || 0) * root.rowCount
         const peak = Math.ceil((root.peaks[col] || 0) * root.rowCount)
         const cell = level - (fromCentre - 1)
-        let glyph = glyphFor(cell)
+        let glyph = glyphFor(cell, false)
         if (glyph === " " && peak === fromCentre)
           glyph = root.peakUp
         line += glyph + " "
@@ -149,7 +178,7 @@ Scope {
         const level = (root.levels[col] || 0) * root.rowCount
         const peak = Math.ceil((root.peaks[col] || 0) * root.rowCount)
         const cell = level - (fromCentre - 1)
-        let glyph = glyphFor(cell)
+        let glyph = glyphFor(cell, true)
         if (glyph === " " && peak === fromCentre)
           glyph = root.peakDown
         line += glyph + " "
@@ -269,15 +298,17 @@ Scope {
     return mins + ":" + (secs < 10 ? "0" : "") + secs
   }
 
-  // A plain rule with a marker on it, in the same block glyphs as everything else.
+  // A plain rule with a marker on it, in the same glyphs as everything else.
   function progressLine(width) {
+    const rule = root.style === "ascii" ? "-" : "\u2500"
+    const mark = root.style === "ascii" ? "o" : "\u25c6"
     if (root.trackLength <= 0)
       return ""
     const ratio = Math.max(0, Math.min(1, root.trackPosition / root.trackLength))
     const at = Math.round(ratio * (width - 1))
     let line = ""
     for (let i = 0; i < width; i++)
-      line += i === at ? "\u25c6" : "\u2500"
+      line += i === at ? mark : rule
     return line
   }
 

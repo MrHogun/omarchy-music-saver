@@ -43,8 +43,8 @@ proportions and then halved, because a character cell is about twice as tall as
 it is wide — covers are not always square, and YouTube Music in particular hands
 out 16:9 video thumbnails that a square assumption squashes.
 
-**A mirrored spectrum**, in block glyphs, growing up and down from a centre
-line, coloured across the theme's own terminal palette -- cool in the bass,
+**A mirrored spectrum**, in whichever glyphs the style preset names, growing up
+and down from a centre line, coloured across the theme's own terminal palette -- cool in the bass,
 warm at the top. Five things borrowed from people who have done this well make
 it read as music rather than noise:
 
@@ -141,11 +141,22 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 | `style` | `ascii`, `blocks` | `ascii` | which ramp draws the cover |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 
-**`ascii`** draws with the classic 70-glyph density ramp
+**`ascii`** draws the cover with the classic 70-glyph density ramp
 (`` .'`^",:;Il!i…$@``): shape and texture, a cover that reads as a drawing.
-**`blocks`** draws with the five shaded block glyphs (` ░▒▓█`): flatter, and
-closer to a photograph at small sizes. Both are watched live — edit
-`shell.json` and the cover on screen is redrawn without a restart.
+**`blocks`** draws it with the five shaded block glyphs (` ░▒▓█`): flatter, and
+closer to a photograph at small sizes.
+
+The preset carries the whole screen, not just the cover. The block spectrum
+fills each cell from the bottom in eighths (`▁▂▃▄▅▆▇█`) — the smooth bar
+everyone knows. ASCII cannot move ink inside a cell, so it does what aalib does
+to a whole image and picks a glyph whose ink already sits where the fill would
+be: the upper half climbs `_ . , : ; i` from the baseline and tops out at `|`,
+the reflection hangs `' " ^ : ; !` from the top of its cell, the falloff
+markers become `-` and `_`, and the progress rule becomes `---o---`. A full
+cell is a bar, so it gets the one glyph that *is* a bar.
+
+Both are watched live — edit `shell.json` and the screen is redrawn without a
+restart.
 
 The defaults and the option list are declared in `manifest.json` under
 `settings`, so there is one description of what the knobs are; the plugin reads
