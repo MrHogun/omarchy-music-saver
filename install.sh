@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
-# Install Music Saver into Omarchy's plugin directory and enable it.
+# Set Music Saver up in Omarchy: copy it in if it is not already there, enable
+# it, and add its entry to the Omarchy menu.
 #
-# Everything lives under ~/.config/omarchy/plugins/, so this needs no root and
-# uninstalling is a matter of removing that one directory.
+# Two ways in, and this handles both. `omarchy plugin add <git-url>` clones the
+# repo straight into ~/.config/omarchy/plugins/<id>/ and never runs a script of
+# ours -- so when this is run from inside that directory it skips the copy and
+# does the rest. Run from a clone anywhere else, it installs the files first.
+#
+# Everything lives under ~/.config/omarchy/, so this needs no root.
 set -euo pipefail
 
 ID=mrhogun.music-saver
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy"
 DEST="$CONFIG/plugins/$ID"
+
+info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33mnote\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[1;31mERROR\033[0m %s\n' "$*" >&2; exit 1; }
 
 # Omarchy's menu is extended from one shared file, so this adds a marked block
 # rather than rewriting it, and uninstall takes exactly that block back out.
@@ -37,10 +46,10 @@ menu_add() {
   mkdir -p "$(dirname "$MENU")"
   [[ -f $MENU ]] || printf '{\n}\n' >"$MENU"
   menu_remove
-  # After the opening brace, so the row is valid whether or not the user has
+  # After the opening brace, so the block is valid whether or not the user has
   # entries of their own. Omarchy strips trailing commas, so one is always safe.
   # Through the environment, not -v: awk expands backslash escapes in a -v
-  # value, which would eat the \" that keeps the row valid JSON.
+  # value, which would eat the \" that keeps the rows valid JSON.
   MENU_BEGIN="$MENU_BEGIN" MENU_ROWS="$MENU_ROWS" MENU_END="$MENU_END" \
   awk '
     !placed && /^[[:space:]]*\{/ {
@@ -55,29 +64,36 @@ menu_add() {
   ' "$MENU" >"$MENU.tmp" && mv "$MENU.tmp" "$MENU"
 }
 
-info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
-die()  { printf '\033[1;31mERROR\033[0m %s\n' "$*" >&2; exit 1; }
-
-[[ ${1:-install} == uninstall ]] && {
-  omarchy plugin disable "$ID" 2>/dev/null || true
+if [[ ${1:-setup} == uninstall ]]; then
+  omarchy plugin disable "$ID" >/dev/null 2>&1 || true
   menu_remove
   rm -rf "$DEST"
-  info "Removed. Restart the shell to unload it: omarchy restart shell"
+  info "Removed. Unload it with: omarchy restart shell"
   exit 0
-}
+fi
 
 command -v omarchy >/dev/null || die "Omarchy not found"
-command -v pw-cat  >/dev/null || die "pw-cat not found -- install pipewire-audio (or pipewire-tools)"
-command -v ffmpeg  >/dev/null || die "ffmpeg not found -- needed to read album art"
 command -v python3 >/dev/null || die "python3 not found"
 
-info "Installing to $DEST"
-mkdir -p "$DEST/bin"
-install -m644 "$SRC/manifest.json" "$SRC/Service.qml" "$DEST/"
-install -m755 "$SRC/bin/art.py" "$SRC/bin/spectrum.py" "$DEST/bin/"
+# The plugin degrades rather than breaks without these: no spectrum without a
+# way to read the speakers, no cover without a way to read the image. Say so
+# and carry on rather than refusing to install.
+command -v pw-cat  >/dev/null || warn "pw-cat not found -- no spectrum until pipewire-audio is installed"
+command -v ffmpeg  >/dev/null || warn "ffmpeg not found -- no album art until it is installed"
+command -v ffprobe >/dev/null || warn "ffprobe not found -- covers will be drawn square"
+
+if [[ $SRC == "$DEST" ]]; then
+  info "Already installed in $DEST"
+else
+  info "Installing to $DEST"
+  mkdir -p "$DEST/bin"
+  install -m644 "$SRC/manifest.json" "$SRC/Service.qml" "$DEST/"
+  install -m755 "$SRC/bin/art.py" "$SRC/bin/spectrum.py" "$DEST/bin/"
+fi
 
 omarchy plugin enable "$ID" >/dev/null 2>&1 || true
 menu_add
-info "Added to the Omarchy menu: System > Screensaver > Music Saver"
-info "Enabled. Load it with: omarchy restart shell"
+
+info "Enabled, and added to the menu: System > Screensaver > Musicsaver"
+info "Load it with: omarchy restart shell"
 info "Then try it without waiting for the idle timer: omarchy-shell music-saver show"

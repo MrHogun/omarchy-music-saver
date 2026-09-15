@@ -17,6 +17,21 @@ yourself.
 ## Install
 
 ```bash
+omarchy plugin add https://github.com/MrHogun/omarchy-music-saver.git --enable
+~/.config/omarchy/plugins/mrhogun.music-saver/install.sh   # menu entry, dependency check
+omarchy restart shell
+```
+
+`omarchy plugin add` is Omarchy's own way in: it clones the repo straight into
+`~/.config/omarchy/plugins/<id>/`, validates the manifest against the same
+rules the shell enforces, and enables it. It runs no script of the plugin's —
+by design, and worth knowing about any plugin you install — so the second line
+is the part that adds the menu entry and tells you if anything it needs is
+missing. Skip it and everything still works, just without the menu row.
+
+From a clone, `./install.sh` does the whole thing, copy included:
+
+```bash
 git clone https://github.com/MrHogun/omarchy-music-saver
 cd omarchy-music-saver
 ./install.sh
@@ -29,7 +44,7 @@ Try it without waiting out the idle timer:
 omarchy-shell music-saver show
 ```
 
-The installer also puts it in the Omarchy menu, under **System › Screensaver**:
+The setup script also puts it in the Omarchy menu, under **System › Screensaver**:
 
 ```
 Screensaver ›
@@ -48,11 +63,16 @@ position it already had, so any new id lands at the bottom of its submenu —
 under Shutdown, in this case. A child is the only place next to Screensaver
 that an extension can reach.
 
-Remove it with `./install.sh uninstall`, which takes exactly that block back
-out; the stock row returns on its own, because it was never edited.
+Remove it with `./install.sh uninstall` (or `omarchy plugin remove
+mrhogun.music-saver`, which leaves the menu block behind — run the script's
+uninstall first). The script takes exactly that block back out; the stock row
+returns on its own, because it was never edited.
 
-Needs `pw-cat` (PipeWire), `ffmpeg` and `python3` — all of which a normal
-Omarchy install already has.
+Needs `python3`, plus `pw-cat` (PipeWire) for the spectrum and `ffmpeg` /
+`ffprobe` for the cover — all of which a normal Omarchy install already has. It
+runs inside the long-lived `omarchy-shell` process like every Omarchy plugin,
+unsandboxed; the code is `Service.qml` and two short Python scripts, and it is
+worth a read before you enable it.
 
 ---
 
