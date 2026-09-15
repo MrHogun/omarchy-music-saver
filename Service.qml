@@ -567,6 +567,22 @@ Scope {
       return JSON.stringify(root.settings)
     }
 
+    // omarchy-shell music-saver help -- every key, its values, and what is set
+    function help(): string {
+      const schema = root.manifest && root.manifest.settings
+        ? root.manifest.settings.schema : null
+      if (!schema)
+        return "no schema in manifest"
+      const lines = []
+      for (const entry of schema) {
+        const options = entry.options ? entry.options.join(" | ")
+          : (entry.min !== undefined ? entry.min + ".." + entry.max : entry.type)
+        lines.push(entry.key + "  " + options
+          + "   [" + root.settings[entry.key] + "]")
+      }
+      return lines.join("\n")
+    }
+
     // omarchy-shell music-saver colors theme|accent|cover
     function colors(name: string): string {
       if (!name)

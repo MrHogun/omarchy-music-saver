@@ -111,7 +111,8 @@ operations per frame, which is nothing next to the audio it is reading.
 omarchy-shell music-saver show           # open it now
 omarchy-shell music-saver hide           # close it
 omarchy-shell music-saver playing        # what it thinks is playing
-omarchy-shell music-saver config         # the settings in force
+omarchy-shell music-saver help           # every key, its values, what is set
+omarchy-shell music-saver config         # the settings in force, as JSON
 omarchy-shell music-saver style ascii    # switch style preset, live
 omarchy-shell music-saver spectrum dots  # switch how the spectrum is drawn
 omarchy-shell music-saver colors cover   # paint it in the cover's colours
