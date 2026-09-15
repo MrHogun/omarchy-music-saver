@@ -67,6 +67,16 @@ Scope {
     const want = String(root.settings.style || "")
     return root.styles.indexOf(want) !== -1 ? want : "ascii"
   }
+  // Where the spectrum takes its colour from.
+  //   theme  -- the theme's own terminal palette, spread across the spectrum
+  //   accent -- one colour, the theme's accent: quietest of the three
+  //   cover  -- colours pulled out of the album art
+  readonly property var colorSources: ["theme", "accent", "cover"]
+  readonly property string colorSource: {
+    const want = String(root.settings.colors || "")
+    return root.colorSources.indexOf(want) !== -1 ? want : "theme"
+  }
+
   readonly property int artWidth: {
     const width = parseInt(root.settings.artWidth)
     return isNaN(width) ? 72 : Math.max(24, Math.min(120, width))
@@ -294,9 +304,46 @@ Scope {
   // spectrum into a grid of coloured text items meant paying for dozens of text
   // layouts a second to achieve something the GPU can do once. Each half is now
   // a single text block, used as a mask over a gradient.
+  // A colour that is legible against whatever the theme uses for background.
+  // Cover colours come from an image that knew nothing about the theme, and a
+  // dark blue on a dark background is not a spectrum, it is a rumour.
+  function legible(colour) {
+    const c = Qt.color(colour)
+    const bg = Color.background
+    const luma = v => 0.299 * v.r + 0.587 * v.g + 0.114 * v.b
+    const onDark = luma(bg) < 0.5
+    const here = luma(c)
+    const want = onDark ? 0.45 : 0.55
+    if (onDark && here >= want)
+      return c
+    if (!onDark && here <= want)
+      return c
+    // Move towards white on a dark background, towards black on a light one,
+    // which keeps the hue and changes only how much of it there is.
+    const towards = onDark ? 1.0 : 0.0
+    const t = Math.min(0.85, Math.abs(want - here) / Math.max(0.05, Math.abs(towards - here)))
+    return Qt.rgba(c.r + (towards - c.r) * t,
+                   c.g + (towards - c.g) * t,
+                   c.b + (towards - c.b) * t, 1)
+  }
+
+  readonly property var palette: {
+    if (root.colorSource === "accent")
+      return []
+    if (root.colorSource === "cover" && root.coverPalette.length >= 2)
+      return root.coverPalette
+    if (root.colorSource === "cover" && root.coverPalette.length === 1)
+      return []
+    return root.themePalette
+  }
+
   function paletteAt(i) {
+    if (root.colorSource === "accent")
+      return Color.accent
+    if (root.colorSource === "cover" && root.coverPalette.length === 1)
+      return root.legible(root.coverPalette[0])
     if (root.palette.length > i)
-      return root.palette[i]
+      return root.legible(root.palette[i])
     return Color.accent
   }
   onLevelsChanged: {
@@ -446,7 +493,7 @@ Scope {
   // and muted -- and in most themes accent sits right next to urgent, so a
   // gradient between them is barely a gradient at all. The theme itself ships a
   // full terminal palette, so read that and spread the spectrum across it.
-  property var palette: []
+  property var themePalette: []
 
   FileView {
     id: themeColors
@@ -466,9 +513,9 @@ Scope {
         if (found[name])
           ramp.push(found[name])
       }
-      root.palette = ramp.length >= 2 ? ramp : []
+      root.themePalette = ramp.length >= 2 ? ramp : []
     }
-    onLoadFailed: root.palette = []
+    onLoadFailed: root.themePalette = []
   }
 
   FileView {
@@ -511,6 +558,17 @@ Scope {
     // omarchy-shell music-saver config -> the values in force
     function config(): string {
       return JSON.stringify(root.settings)
+    }
+
+    // omarchy-shell music-saver colors theme|accent|cover
+    function colors(name: string): string {
+      if (!name)
+        return root.colorSource
+      if (root.colorSources.indexOf(name) === -1)
+        return "unknown colour source: " + name + " (" + root.colorSources.join(", ") + ")"
+      if (!root.writeSetting("colors", name))
+        return "could not write shell.json"
+      return name
     }
 
     // omarchy-shell music-saver spectrum bars|ascii|density|wave|dots|auto
@@ -588,6 +646,26 @@ Scope {
 
   property string artRendered: ""
 
+  // The cover's own colours, for when the spectrum is told to wear them. Picked
+  // in art.py: saturated enough to be a colour, bright enough to be seen, and
+  // far enough apart in hue to read as different -- the average of a cover is
+  // always mud, and its most common colour is usually its background.
+  property var coverPalette: []
+
+  Process {
+    id: artColours
+    command: ["python3", Quickshell.env("HOME")
+      + "/.config/omarchy/plugins/mrhogun.music-saver/bin/art.py", root.artUrl,
+      "palette", "5"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        const found = text.trim().split(/\s+/).filter(c => c.charAt(0) === "#")
+        root.coverPalette = found
+      }
+    }
+  }
+
   // Dip out, swap, come back. Cross-fading meant two rich-text blocks of about
   // eight hundred spans each laid out at once, and that lands as a stutter on
   // every track change -- which is exactly when it is most visible.
@@ -625,6 +703,18 @@ Scope {
     // so let the stop settle before asking for the next draw.
     artRender.running = false
     Qt.callLater(function() { artRender.running = true })
+    if (root.colorSource === "cover") {
+      artColours.running = false
+      Qt.callLater(function() { artColours.running = true })
+    }
+  }
+
+  // Switching to cover colours mid-track has no new art to wait for.
+  onColorSourceChanged: {
+    if (root.colorSource !== "cover" || !root.artUrl)
+      return
+    artColours.running = false
+    Qt.callLater(function() { artColours.running = true })
   }
 
   onArtSignatureChanged: refreshArt()

@@ -113,6 +113,8 @@ omarchy-shell music-saver hide           # close it
 omarchy-shell music-saver playing        # what it thinks is playing
 omarchy-shell music-saver config         # the settings in force
 omarchy-shell music-saver style ascii    # switch style preset, live
+omarchy-shell music-saver spectrum dots  # switch how the spectrum is drawn
+omarchy-shell music-saver colors cover   # paint it in the cover's colours
 omarchy-shell music-saver artWidth 88    # widen the cover, live
 ```
 
@@ -140,6 +142,7 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 |---|---|---|---|
 | `style` | `ascii`, `blocks`, `dots` | `ascii` | which alphabet draws the cover |
 | `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots` | `auto` | how the spectrum is drawn |
+| `colors` | `theme`, `accent`, `cover` | `theme` | where the spectrum takes its colour from |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 
 **`ascii`** draws the cover with the classic 70-glyph density ramp
@@ -166,6 +169,32 @@ alphabet too — `spectrum: auto` means `bars` under `blocks` and `ascii` under
 
 Both are watched live — edit `shell.json` and the screen is redrawn without a
 restart.
+
+### Colour
+
+| `colors` | Where it comes from |
+|---|---|
+| `theme` | the theme's own terminal palette, green → cyan → magenta → blue → red across the spectrum |
+| `accent` | one colour, the theme's accent — the quietest of the three |
+| `cover` | colours pulled out of the album art |
+
+`cover` is the one that needs a rule, because the obvious approaches all fail:
+the average of a cover is mud, and its most common colour is usually its
+background. So `art.py palette` throws away everything that is not a colour —
+under 22% saturation or 25% value — buckets what is left by hue into 15°
+steps, and weights each pixel by `saturation × value`, so a handful of vivid
+pixels outrank a wash of grey ones. The heaviest buckets win, but only if they
+sit at least 30° from every bucket already picked: neighbouring hues are the
+same colour at this size, and a gradient between them is a gradient between
+nothing and nothing. Each survivor is then pushed back up to at least 55%
+saturation and 72% value — averaging a bucket always comes back duller than the
+pixels in it — and the results are sorted by hue so they read as a ramp.
+
+The shell adds the last step, because only it knows the theme: every colour is
+checked against the background's luminance and moved towards white (or, on a
+light theme, towards black) until it is legible. A dark blue on a dark
+background is not a spectrum, it is a rumour. A cover with no colour in it at
+all — plenty are pure greyscale — falls back to the theme palette.
 
 The defaults and the option list are declared in `manifest.json` under
 `settings`, so there is one description of what the knobs are; the plugin reads

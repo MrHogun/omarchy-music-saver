@@ -16,7 +16,8 @@
     "defaults": {
       "style": "ascii",
       "artWidth": 72,
-      "spectrum": "auto"
+      "spectrum": "auto",
+      "colors": "theme"
     },
     "schema": [
       {
@@ -45,6 +46,18 @@
         "default": "auto",
         "label": "Spectrum",
         "description": "How the spectrum is drawn. auto follows the style preset: bars for blocks, ascii for ascii, dots for dots."
+      },
+      {
+        "key": "colors",
+        "type": "enum",
+        "options": [
+          "theme",
+          "accent",
+          "cover"
+        ],
+        "default": "theme",
+        "label": "Spectrum colours",
+        "description": "theme spreads the spectrum across the theme's terminal palette, accent paints it in one colour, cover pulls bright distinct colours out of the album art."
       },
       {
         "key": "artWidth",

@@ -12,7 +12,9 @@ are not always square: YouTube Music hands out video thumbnails at 16:9, and
 assuming a square there squashes them.
 
 Usage: art.py <path-or-url> [cols] [blocks|ascii|dots]
+       art.py <path-or-url> palette [count]   -- print colours, not art
 """
+import colorsys
 import html
 import subprocess
 import sys
@@ -174,12 +176,84 @@ def cells_from_braille(pixels, cols, rows):
         yield cells
 
 
+# Picking colours out of a cover, for the spectrum to be painted with.
+#
+# Taking the most common colours outright does not work: covers are mostly
+# near-black or near-white, and the average of an image is always mud. What the
+# spectrum needs is the opposite -- a few colours that are saturated enough to
+# be a colour at all, bright enough to sit on the background without vanishing,
+# and far enough apart in hue to read as different from each other.
+MIN_SATURATION = 0.22
+MIN_VALUE = 0.25
+HUE_BUCKETS = 24          # 15 degrees each
+MIN_HUE_DISTANCE = 2      # buckets, so 30 degrees between chosen colours
+
+
+def cover_palette(pixels, count):
+    weights = [0.0] * HUE_BUCKETS
+    sums = [[0.0, 0.0, 0.0] for _ in range(HUE_BUCKETS)]
+
+    for row in pixels:
+        for r, g, b in row:
+            h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            if s < MIN_SATURATION or v < MIN_VALUE:
+                continue
+            # Weight by how much of a colour it is: a washed-out pixel counts
+            # for less than a vivid one, even where the washed-out ones are the
+            # majority -- which on a cover they usually are.
+            weight = s * v
+            bucket = min(HUE_BUCKETS - 1, int(h * HUE_BUCKETS))
+            weights[bucket] += weight
+            for i, c in enumerate((r, g, b)):
+                sums[bucket][i] += c * weight
+
+    order = sorted(range(HUE_BUCKETS), key=lambda i: weights[i], reverse=True)
+    chosen = []
+    for bucket in order:
+        if weights[bucket] <= 0:
+            break
+        # Neighbouring hues are the same colour to the eye at this size, and a
+        # gradient between them is a gradient between nothing and nothing.
+        if any(min(abs(bucket - taken), HUE_BUCKETS - abs(bucket - taken))
+               < MIN_HUE_DISTANCE for taken in chosen):
+            continue
+        chosen.append(bucket)
+        if len(chosen) >= count:
+            break
+
+    out = []
+    for bucket in chosen:
+        r, g, b = (c / weights[bucket] for c in sums[bucket])
+        h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+        # The average of a bucket always comes back duller than the pixels in
+        # it. Put back enough saturation and brightness that the colour holds
+        # its own against a dark background; the consumer still decides the
+        # final contrast, because only it knows what the background is.
+        s = max(s, 0.55)
+        v = max(v, 0.72)
+        r, g, b = (int(round(c * 255)) for c in colorsys.hsv_to_rgb(h, s, v))
+        out.append((h, f"#{r:02x}{g:02x}{b:02x}"))
+
+    # Hue order, so consumers get a ramp rather than a jumble.
+    out.sort(key=lambda pair: pair[0])
+    return [colour for _, colour in out]
+
+
 def main():
     if len(sys.argv) < 2:
         return 1
     path = sys.argv[1]
     if path.startswith("file://"):
         path = path[7:]
+    if len(sys.argv) > 2 and sys.argv[2] == "palette":
+        count = int(sys.argv[3]) if len(sys.argv) > 3 else 5
+        # 64 wide is plenty: this is a question about colour, not detail.
+        pixels = sample(path, 64, 64)
+        if pixels is None:
+            return 1
+        print(" ".join(cover_palette(pixels, count)))
+        return 0
+
     cols = int(sys.argv[2]) if len(sys.argv) > 2 else 44
     style = sys.argv[3] if len(sys.argv) > 3 else "blocks"
 
