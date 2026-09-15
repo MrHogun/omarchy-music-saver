@@ -361,8 +361,14 @@ Scope {
     return Color.accent
   }
   // Frequency across the same five stops the glyph spectrum paints with, so
-  // a preset change swaps the drawing and not the colour scheme.
+  // a preset change swaps the drawing and not the colour scheme -- except
+  // under the system preset, which is the shell's own language and paints its
+  // meters the one colour the shell paints meters: the theme accent. A card
+  // that borrows the panel look and then wears colours off an album cover is
+  // not borrowing the panel look.
   function spectrumColour(t) {
+    if (root.style === "system")
+      return Color.accent
     const span = 4 * Math.max(0, Math.min(0.999, t))
     const stop = Math.floor(span)
     const here = Qt.color(root.paletteAt(stop))

@@ -61,7 +61,7 @@
         ],
         "default": "cover",
         "label": "Spectrum colours",
-        "description": "theme spreads the spectrum across the theme's terminal palette, accent paints it in one colour, cover pulls bright distinct colours out of the album art."
+        "description": "theme spreads the spectrum across the theme's terminal palette, accent paints it in one colour, cover pulls bright distinct colours out of the album art. The system style ignores this and always uses the theme accent, the way the shell paints its own meters."
       },
       {
         "key": "artWidth",

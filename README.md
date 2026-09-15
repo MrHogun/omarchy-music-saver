@@ -205,7 +205,7 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 |---|---|---|---|
 | `style` | `ascii`, `blocks`, `dots`, `system` | `dots` | which alphabet draws the cover — or `system`, which uses none |
 | `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots`, `native` | `auto` | how the spectrum is drawn |
-| `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from |
+| `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from (the `system` style ignores it) |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 | `showWhenIdle` | `true`, `false` | `true` | whether idling into the screensaver hands over to this one |
 
@@ -238,9 +238,9 @@ enlargement. Every dimension goes through `Style.space()` and every colour
 through the `Color` tokens, so it follows the theme's spacing and font scale
 too.
 
-Pair it with `colors: accent` for the flat theme accent — `Color.accent`, the
-same colour the shell fills its sliders and selections with — instead of a
-gradient.
+Its bars are always `Color.accent` — the colour the shell fills its own sliders
+and selections with — whatever `colors` says. A card that borrows the panel look
+and then wears colours off an album cover is not borrowing the panel look.
 
 <p align="center">
   <img src="docs/system.png" width="70%" alt="the system preset: an Omarchy panel card at screensaver size">
