@@ -49,13 +49,20 @@ Scope {
 
   // Writing goes back through the shell rather than to the file: shell.json is
   // the shell's to own, and updateEntryInline is the sanctioned way in.
+  //
+  // It replaces the entry with what it is given -- "settings is the merged
+  // plugin state", not a patch -- so a one-key write has to carry every other
+  // value with it, or changing the style would quietly drop the colours.
   function writeSetting(key, value) {
     if (!root.shell || typeof root.shell.updateEntryInline !== "function")
       return false
-    const patch = {}
-    patch[key] = value
+    const merged = {}
+    for (const name in root.settings)
+      if (name !== "id")
+        merged[name] = root.settings[name]
+    merged[key] = value
     return root.shell.updateEntryInline(
-      root.manifest ? root.manifest.id : "mrhogun.music-saver", patch)
+      root.manifest ? root.manifest.id : "mrhogun.music-saver", merged)
   }
 
   // The style preset decides the alphabet the whole screen speaks: "ascii" the
