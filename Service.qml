@@ -125,15 +125,32 @@ Scope {
   // Follow the user's own screensaver timing rather than inventing one.
   property int idleSeconds: 150
 
+  // Prefer whatever is playing, but fall back to any player that still has a
+  // track loaded. Binding everything to "is playing" meant a pause emptied the
+  // title, the artist and the cover, and resuming had to rebuild all of it.
   readonly property var player: {
     const players = Mpris.players ? Mpris.players.values : []
     for (const p of players) {
       if (p && p.playbackState === MprisPlaybackState.Playing)
         return p
     }
+    for (const p of players) {
+      if (p && (p.trackTitle || p.trackArtist))
+        return p
+    }
     return null
   }
-  readonly property bool musicPlaying: player !== null
+
+  readonly property bool anyPlaying: {
+    const players = Mpris.players ? Mpris.players.values : []
+    for (const p of players) {
+      if (p && p.playbackState === MprisPlaybackState.Playing)
+        return true
+    }
+    return false
+  }
+
+  readonly property bool musicPlaying: anyPlaying
   readonly property string title: player ? (player.trackTitle || "") : ""
   readonly property string artist: player ? (player.trackArtist || "") : ""
   readonly property string artUrl: player ? (player.trackArtUrl || "") : ""
@@ -300,15 +317,25 @@ Scope {
       + "/.config/omarchy/plugins/mrhogun.music-saver/bin/art.py", root.artUrl, "72"]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.artHtml = text.trim()
+      onStreamFinished: {
+        const drawn = text.trim()
+        if (drawn)
+          root.artHtml = drawn
+        else
+          root.artRendered = ""   // let the next change try again
+      }
     }
   }
 
+  property string artRendered: ""
+
   function refreshArt() {
-    if (!root.showing || !root.artUrl) {
-      root.artHtml = ""
+    // Track changes can blank the url for a moment, and a pause used to blank it
+    // for good. Neither should take the cover off the screen: hold the last one
+    // until a new one has actually been drawn.
+    if (!root.showing || !root.artUrl || root.artUrl === root.artRendered)
       return
-    }
+    root.artRendered = root.artUrl
     artRender.running = false
     artRender.running = true
   }

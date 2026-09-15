@@ -9,6 +9,7 @@ No numpy: the FFT here is a textbook radix-2, which at 512 points costs a few
 thousand operations per frame -- nothing next to the audio it is reading.
 """
 import cmath
+import json
 import math
 import os
 import struct
@@ -29,13 +30,38 @@ AGC_DECAY = 0.996     # how long the auto sensitivity remembers a loud passage
 AGC_MIN = 0.08        # never amplify silence into a full display
 
 
-def default_monitor():
-    """The monitor source of whatever sink audio is currently going to."""
+def default_sink():
+    """Whatever sink audio is currently going to."""
     try:
         out = subprocess.run(["pactl", "info"], capture_output=True, text=True, timeout=5).stdout
         for line in out.splitlines():
             if line.startswith("Default Sink:"):
-                return line.split(":", 1)[1].strip() + ".monitor"
+                return line.split(":", 1)[1].strip()
+    except Exception:
+        pass
+    return None
+
+
+def node_id(name):
+    """PipeWire node id for a node name.
+
+    pw-cat's --target takes a name or an id, but a name it cannot resolve is not
+    an error: it falls back to the default source, which is the microphone. That
+    failure is silent and looks exactly like a working visualiser that happens to
+    react to the room instead of the music, so resolve the id and pass that.
+
+    Note there is no separate node for a sink's monitor -- it is the sink node
+    captured with stream.capture.sink, which is why looking for "<sink>.monitor"
+    finds nothing.
+    """
+    try:
+        dump = subprocess.run(["pw-dump"], capture_output=True, text=True, timeout=10).stdout
+        for obj in json.loads(dump):
+            if obj.get("type") != "PipeWire:Interface:Node":
+                continue
+            props = (obj.get("info") or {}).get("props") or {}
+            if props.get("node.name") == name:
+                return str(obj.get("id"))
     except Exception:
         pass
     return None
@@ -101,13 +127,20 @@ def band_edges():
 
 
 def main():
-    monitor = default_monitor()
-    if not monitor:
+    sink = default_sink()
+    if not sink:
         print("no default sink found", file=sys.stderr)
         return 1
 
-    cmd = ["pw-cat", "--record", "--target", monitor, "--rate", str(RATE),
-           "--channels", "1", "--format", "f32", "--raw", "-"]
+    target = node_id(sink)
+    if not target:
+        print(f"could not resolve a node id for {sink}", file=sys.stderr)
+        return 1
+    print(f"listening to {sink} (node {target})", file=sys.stderr)
+
+    cmd = ["pw-cat", "--record", "--target", target,
+           "-P", "{ stream.capture.sink=true }",
+           "--rate", str(RATE), "--channels", "1", "--format", "f32", "--raw", "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     edges = band_edges()

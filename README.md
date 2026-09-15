@@ -125,10 +125,12 @@ a resting hand does not dismiss it.
 
 ## Known edges
 
-- The analyser follows the **default sink**. On an unusual setup — a filter
-  chain in front of the hardware, say — check that the default sink is the one
-  actually carrying audio, or its monitor will be silent and the bars will sit
-  flat.
+- The analyser follows the **default sink**, captured with
+  `stream.capture.sink` on the sink's own node — a sink's monitor is not a
+  separate node, so asking for `<sink>.monitor` finds nothing. It also resolves
+  the node **id** rather than passing a name: `pw-cat --target` treats a name it
+  cannot resolve as a cue to fall back to the default *source*, silently, which
+  turns the whole thing into a microphone visualiser that looks like it works.
 - Rich text with one span per cell is not free; the cover is redrawn only when
   the track changes, never per frame.
 - Omarchy's own idle service keeps running. This overlay sits on the overlay
