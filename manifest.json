@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "mrhogun.music-saver",
+  "name": "Music Saver",
+  "version": "0.1.0",
+  "author": "MrHogun",
+  "description": "Shows a spectrum visualiser instead of the plain screensaver while music is playing.",
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}
