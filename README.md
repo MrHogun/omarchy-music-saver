@@ -37,8 +37,8 @@ Omarchy install already has.
 
 **Album art as coloured ASCII.** Players cache the cover on disk and point MPRIS
 at it, so this reads a local file rather than the network. `ffmpeg` scales it,
-and each cell gets a character chosen from a 70-step ramp by luminance, coloured
-like the pixel it stands for. The height is worked out from the source's own
+and each cell gets a character chosen by luminance from the ramp the current
+[style preset](#settings) names, coloured like the pixel it stands for. The height is worked out from the source's own
 proportions and then halved, because a character cell is about twice as tall as
 it is wide — covers are not always square, and YouTube Music in particular hands
 out 16:9 video thumbnails that a square assumption squashes.
@@ -108,21 +108,67 @@ operations per frame, which is nothing next to the audio it is reading.
 ## Commands
 
 ```bash
-omarchy-shell music-saver show      # open it now
-omarchy-shell music-saver hide      # close it
-omarchy-shell music-saver playing   # what it thinks is playing
+omarchy-shell music-saver show           # open it now
+omarchy-shell music-saver hide           # close it
+omarchy-shell music-saver playing        # what it thinks is playing
+omarchy-shell music-saver config         # the settings in force
+omarchy-shell music-saver style ascii    # switch style preset, live
+omarchy-shell music-saver artWidth 88    # widen the cover, live
 ```
 
 It closes on any key, a click, or a mouse move of more than 40 px — enough that
 a resting hand does not dismiss it.
 
+---
+
+## Settings
+
+Omarchy keeps every plugin's settings **inline on its entry** in
+`~/.config/omarchy/shell.json` — no `config:` block, no per-plugin file, no
+merge layers. This plugin is a service, so its entry lives in `plugins[]`:
+
+```json
+{
+  "version": 1,
+  "plugins": [
+    { "id": "mrhogun.music-saver", "style": "ascii", "artWidth": 72 }
+  ]
+}
+```
+
+| Key | Values | Default | What it does |
+|---|---|---|---|
+| `style` | `ascii`, `blocks` | `ascii` | which ramp draws the cover |
+| `artWidth` | 24–120 | `72` | cover width in characters |
+
+**`ascii`** draws with the classic 70-glyph density ramp
+(`` .'`^",:;Il!i…$@``): shape and texture, a cover that reads as a drawing.
+**`blocks`** draws with the five shaded block glyphs (` ░▒▓█`): flatter, and
+closer to a photograph at small sizes. Both are watched live — edit
+`shell.json` and the cover on screen is redrawn without a restart.
+
+The defaults and the option list are declared in `manifest.json` under
+`settings`, so there is one description of what the knobs are; the plugin reads
+them from its own manifest and layers the user's entry on top. Writes made
+through `omarchy-shell music-saver style …` go back through the shell's
+`updateEntryInline`, which is the sanctioned way to change `shell.json` —
+the plugin never writes that file itself.
+
+> Third-party plugins are not handed their settings by the shell: a service
+> receives only its manifest and a capability-scoped shell api, so it reads its
+> own entry out of `shell.json` (watched, hence live). Manifests may also
+> declare a `settingsForm`, but Omarchy 4.0 ships no renderer for one, so there
+> is no settings GUI yet — the file and the IPC commands are the interface.
+
 ## Tuning
+
+Past the settings above, the rest is source-level:
 
 | Where | Knob |
 |---|---|
-| `Service.qml` | `barCount`, `rowCount`, `peakFall`, art width (`"72"`) and `pixelSize` |
+| `Service.qml` | `barCount`, `rowCount`, `peakFall`, `pixelSize` |
 | `bin/spectrum.py` | `BARS`, `FPS`, `RISE`, `FALL`, `SPREAD`, `LOW_HZ`, `HIGH_HZ` |
-| `bin/art.py` | `RAMP` — the luminance ramp |
+| `bin/art.py` | `RAMPS` — the luminance ramps the presets name |
 
 ## Known edges
 

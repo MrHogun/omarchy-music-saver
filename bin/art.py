@@ -11,14 +11,22 @@ is halved -- but only after the source's own shape is taken into account. Covers
 are not always square: YouTube Music hands out video thumbnails at 16:9, and
 assuming a square there squashes them.
 
-Usage: art.py <path-or-url> [cols]
+Usage: art.py <path-or-url> [cols] [blocks|ascii]
 """
 import html
 import subprocess
 import sys
 
 # Dark to light. Denser glyphs read as brighter areas once they are coloured.
-RAMP = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$"
+# Shape, not density, is what the eye reads at this size: a ramp of letters and
+# punctuation turns a cover into noise because every glyph has a different
+# outline. Blocks share one outline and differ only in how much they fill, so
+# the picture survives.
+RAMPS = {
+    "blocks": " \u2591\u2592\u2593\u2588",
+    # The old one, kept so the two can be compared side by side.
+    "ascii": " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+}
 
 
 # How much taller a character cell is than it is wide. Close enough across the
@@ -63,6 +71,7 @@ def main():
     if path.startswith("file://"):
         path = path[7:]
     cols = int(sys.argv[2]) if len(sys.argv) > 2 else 44
+    ramp = RAMPS.get(sys.argv[3] if len(sys.argv) > 3 else "blocks", RAMPS["blocks"])
 
     shape = source_shape(path)
     if shape:
@@ -77,19 +86,38 @@ def main():
 
     out = []
     for row in pixels:
-        line = []
+        # Build the row as (colour, glyph) first, then emit one span per run of
+        # equal colour. A cover has large flat areas, and a span per cell means
+        # thousands of them for the text engine to lay out at once -- which is
+        # felt as a stutter exactly when a track changes.
+        cells = []
         for r, g, b in row:
             # Rec. 601 luma: green carries most of the perceived brightness.
             luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
-            glyph = RAMP[min(len(RAMP) - 1, int(luma * len(RAMP)))]
+            glyph = ramp[min(len(ramp) - 1, int(luma * len(ramp)))]
             if glyph == " ":
-                line.append("&nbsp;")
+                cells.append((None, "&nbsp;"))
                 continue
             # Lift very dark cells so the shape stays visible on a dark backdrop.
             scale = 1.0 if luma > 0.25 else 1.0 + (0.25 - luma)
             rr, gg, bb = (min(255, int(c * scale)) for c in (r, g, b))
-            line.append(f'<span style="color:#{rr:02x}{gg:02x}{bb:02x}">'
-                        f'{html.escape(glyph)}</span>')
+            # Quantising to 5 bits a channel is invisible at this size at this size
+            # and lets neighbouring cells share a span.
+            colour = f"#{rr & 0xf8:02x}{gg & 0xf8:02x}{bb & 0xf8:02x}"
+            cells.append((colour, html.escape(glyph)))
+
+        line = []
+        run_colour, run_text = cells[0] if cells else (None, "")
+        for colour, glyph in cells[1:]:
+            if colour == run_colour:
+                run_text += glyph
+                continue
+            line.append(run_text if run_colour is None
+                        else f'<span style="color:{run_colour}">{run_text}</span>')
+            run_colour, run_text = colour, glyph
+        if run_text:
+            line.append(run_text if run_colour is None
+                        else f'<span style="color:{run_colour}">{run_text}</span>')
         out.append("".join(line))
 
     print("<br>".join(out))

@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Mpris
 import qs.Commons
+import Qt5Compat.GraphicalEffects
 
 // Music Saver: while something is playing, idling into the screensaver should
 // show what is playing rather than a terminal animation.
@@ -14,8 +15,61 @@ import qs.Commons
 Scope {
   id: root
 
+  // Injected by the shell when the service is created.
+  property var shell: null
+  property var manifest: null
+
+  // Third-party plugins get no settings handed to them: the shell injects the
+  // manifest and a capability-scoped shell api, and nothing else. Per the
+  // shell's storage rules the user's values live inline on this plugin's entry
+  // in shell.json, so read them from there and take the defaults out of our own
+  // manifest, which keeps one declaration of what the options are.
+  property var settings: root.defaults()
+
+  function defaults() {
+    const declared = root.manifest && root.manifest.settings
+      ? root.manifest.settings.defaults : null
+    return declared ? JSON.parse(JSON.stringify(declared)) : {}
+  }
+
+  function readSettings(parsed) {
+    const merged = root.defaults()
+    const id = root.manifest ? root.manifest.id : "mrhogun.music-saver"
+    const entries = parsed && Array.isArray(parsed.plugins) ? parsed.plugins : []
+    for (const entry of entries) {
+      if (!entry || entry.id !== id)
+        continue
+      for (const key in entry)
+        if (key !== "id")
+          merged[key] = entry[key]
+      break
+    }
+    root.settings = merged
+  }
+
+  // Writing goes back through the shell rather than to the file: shell.json is
+  // the shell's to own, and updateEntryInline is the sanctioned way in.
+  function writeSetting(key, value) {
+    if (!root.shell || typeof root.shell.updateEntryInline !== "function")
+      return false
+    const patch = {}
+    patch[key] = value
+    return root.shell.updateEntryInline(
+      root.manifest ? root.manifest.id : "mrhogun.music-saver", patch)
+  }
+
+  // "ascii" draws the cover with the classic 70-glyph density ramp; "blocks"
+  // uses the five shaded block glyphs.
+  readonly property string style: root.settings.style === "blocks" ? "blocks" : "ascii"
+  readonly property int artWidth: {
+    const width = parseInt(root.settings.artWidth)
+    return isNaN(width) ? 72 : Math.max(24, Math.min(120, width))
+  }
+
+  onManifestChanged: shellConfig.reload()
+
   readonly property int barCount: 32
-  readonly property int rowCount: 10
+  readonly property int rowCount: 8
   property var levels: new Array(32).fill(0)
   property var peaks: new Array(32).fill(0)
   property real overallLevel: 0
@@ -30,7 +84,7 @@ Scope {
   readonly property string peakDown: "\u2581"  // lower one eighth block
   readonly property real peakFall: 0.012
 
-  readonly property int bandCount: 8
+  readonly property int bandCount: 4
 
   // Frequency picks the colour, height picks how bright it burns, and the
   // lower half is a reflection rather than a second spectrum.
@@ -68,7 +122,8 @@ Scope {
   }
 
   function render() {
-    const lines = []
+    const upper = []
+    const lower = []
 
     // Upper half: row 0 is the top, so it stands for the loudest level.
     for (let row = 0; row < root.rowCount; row++) {
@@ -83,7 +138,7 @@ Scope {
           glyph = root.peakUp
         line += glyph + " "
       }
-      lines.push(line)
+      upper.push(line)
     }
 
     // Lower half: the same columns reflected, so the loud end sits at the edges.
@@ -99,13 +154,24 @@ Scope {
           glyph = root.peakDown
         line += glyph + " "
       }
-      lines.push(line)
+      lower.push(line)
     }
 
-    return lines
+    return { upper: upper.join("\n"), lower: lower.join("\n") }
   }
 
-  property var frameRows: render()
+
+  property var frame: render()
+
+  // Colour is static -- it never changes between frames -- so splitting the
+  // spectrum into a grid of coloured text items meant paying for dozens of text
+  // layouts a second to achieve something the GPU can do once. Each half is now
+  // a single text block, used as a mask over a gradient.
+  function paletteAt(i) {
+    if (root.palette.length > i)
+      return root.palette[i]
+    return Color.accent
+  }
   onLevelsChanged: {
     const next = []
     for (let i = 0; i < root.barCount; i++) {
@@ -118,7 +184,7 @@ Scope {
     for (let i = 0; i < root.barCount; i++)
       sum += root.levels[i] || 0
     root.overallLevel = Math.min(1, sum / root.barCount * 3)
-    frameRows = render()
+    frame = render()
   }
   property bool showing: false
 
@@ -160,9 +226,16 @@ Scope {
   // jumps down and back. Keep the last real values until new ones arrive.
   property string heldTitle: ""
   property string heldArtist: ""
-  onTitleChanged: if (title) heldTitle = title
+  onTitleChanged: {
+    if (!title)
+      return
+    heldTitle = title
+    if (root.showing)
+      revealAnimation.restart()
+  }
   onArtistChanged: if (artist) heldArtist = artist
-  property string artHtml: ""
+  property string artHtml: ""      // what is on screen
+  property string artIncoming: ""  // what is fading in over it
 
   // Omarchy's own screensaver animates its wordmark with ttfx effects --
   // decrypt, beams, laseretch. This borrows the first: the title lands as
@@ -271,12 +344,14 @@ Scope {
     id: shellConfig
     path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
     watchChanges: true
+    onFileChanged: reload()
     onLoaded: {
       try {
         const parsed = JSON.parse(text())
         const seconds = parsed && parsed.idle ? parsed.idle.screensaver : null
         if (typeof seconds === "number" && seconds > 0)
           root.idleSeconds = seconds
+        root.readSettings(parsed)
       } catch (e) {
         // A malformed shell.json is the shell's problem to report, not ours;
         // fall back to the default rather than failing to load.
@@ -301,6 +376,33 @@ Scope {
     function playing(): string {
       return root.musicPlaying ? (root.title + " - " + root.artist) : "nothing playing"
     }
+
+    // omarchy-shell music-saver config -> the values in force
+    function config(): string {
+      return JSON.stringify(root.settings)
+    }
+
+    // omarchy-shell music-saver style ascii|blocks
+    function style(name: string): string {
+      if (!name)
+        return root.style
+      if (name !== "ascii" && name !== "blocks")
+        return "unknown style: " + name + " (ascii, blocks)"
+      if (!root.writeSetting("style", name))
+        return "could not write shell.json"
+      return name
+    }
+
+    function artWidth(columns: string): string {
+      if (!columns)
+        return String(root.artWidth)
+      const width = parseInt(columns)
+      if (isNaN(width) || width < 24 || width > 120)
+        return "artWidth must be between 24 and 120"
+      if (!root.writeSetting("artWidth", width))
+        return "could not write shell.json"
+      return String(width)
+    }
   }
 
   IdleMonitor {
@@ -322,33 +424,69 @@ Scope {
   Process {
     id: artRender
     command: ["python3", Quickshell.env("HOME")
-      + "/.config/omarchy/plugins/mrhogun.music-saver/bin/art.py", root.artUrl, "72"]
+      + "/.config/omarchy/plugins/mrhogun.music-saver/bin/art.py", root.artUrl,
+      String(root.artWidth), root.style]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
         const drawn = text.trim()
-        if (drawn)
-          root.artHtml = drawn
-        else
+        if (!drawn) {
           root.artRendered = ""   // let the next change try again
+          return
+        }
+        if (!root.artHtml) {
+          root.artHtml = drawn    // nothing to cross from on the first track
+          return
+        }
+        root.artIncoming = drawn
+        artFade.restart()
       }
     }
   }
 
   property string artRendered: ""
 
+  // Dip out, swap, come back. Cross-fading meant two rich-text blocks of about
+  // eight hundred spans each laid out at once, and that lands as a stutter on
+  // every track change -- which is exactly when it is most visible.
+  SequentialAnimation {
+    id: artFade
+    NumberAnimation {
+      target: artCurrent; property: "opacity"
+      to: 0; duration: 220; easing.type: Easing.InQuad
+    }
+    ScriptAction {
+      script: {
+        root.artHtml = root.artIncoming
+        root.artIncoming = ""
+      }
+    }
+    NumberAnimation {
+      target: artCurrent; property: "opacity"
+      to: 1; duration: 320; easing.type: Easing.OutQuad
+    }
+  }
+
+  // What the cover on screen was drawn from. A style or width change has to
+  // redraw the same track, so key the cache on everything the drawing depends
+  // on rather than on the url alone.
+  readonly property string artSignature: root.artUrl + "|" + root.style + "|" + root.artWidth
+
   function refreshArt() {
     // Track changes can blank the url for a moment, and a pause used to blank it
     // for good. Neither should take the cover off the screen: hold the last one
     // until a new one has actually been drawn.
-    if (!root.showing || !root.artUrl || root.artUrl === root.artRendered)
+    if (!root.showing || !root.artUrl || root.artSignature === root.artRendered)
       return
-    root.artRendered = root.artUrl
+    root.artRendered = root.artSignature
+    // Toggling running twice inside one frame collapses to no change at all,
+    // so let the stop settle before asking for the next draw.
     artRender.running = false
-    artRender.running = true
+    Qt.callLater(function() { artRender.running = true })
   }
 
-  onArtUrlChanged: refreshArt()
+  onArtSignatureChanged: refreshArt()
+
   onShowingChanged: refreshArt()
 
   // The analyser only runs while the saver is up: no point reading the speakers
@@ -423,58 +561,99 @@ Scope {
         anchors.centerIn: parent
         spacing: Style.space(48)
 
-        Text {
+        Item {
           anchors.horizontalCenter: parent.horizontalCenter
+          width: artCurrent.implicitWidth
+          height: artCurrent.implicitHeight
           opacity: root.artHtml !== "" ? 1 : 0
-          text: root.artHtml
-          textFormat: Text.RichText
-          font.family: Style.fontFamily
-          font.pixelSize: 15
-          lineHeight: 0.78
-          horizontalAlignment: Text.AlignHCenter
+          Behavior on opacity { NumberAnimation { duration: 250 } }
+
+          // A track change swapping one block of text for another lands as a
+          // jump cut. Two layers, with the new one brought up over the old,
+          // makes it a dissolve instead.
+          Text {
+            id: artCurrent
+            text: root.artHtml
+            opacity: 1
+            textFormat: Text.RichText
+            font.family: Style.fontFamily
+            font.pixelSize: 15
+            lineHeight: 0.78
+            horizontalAlignment: Text.AlignHCenter
+          }
+
         }
 
-        // The spectrum, a row at a time. Drawing it as one block of text makes
-        // a single flat slab; row by row, each line can carry its own colour and
-        // weight, which is what gives the shape any depth.
+        // The spectrum: two blocks of monospace text used as masks over a
+        // gradient built from the theme's palette. Bass on the left, treble on
+        // the right, and the lower half kept dim so it reads as a reflection.
         Column {
           anchors.horizontalCenter: parent.horizontalCenter
           spacing: 0
 
-          Repeater {
-            model: root.frameRows
+          Component.onCompleted: {}
 
-            Row {
-              id: spectrumRow
-              required property int index
-              required property string modelData
+          Item {
+            width: upperText.implicitWidth
+            height: upperText.implicitHeight
 
-              readonly property int half: root.rowCount
-              readonly property bool lower: index >= half
-              // Distance from the centre line, 0 at the base out to 1 at the tip.
-              readonly property real reach: (lower ? index - half + 1 : half - index) / half
+            Text {
+              id: upperText
+              text: root.frame.upper
+              font.family: Style.fontFamily
+              font.pixelSize: 20
+              lineHeight: 0.92
+              // Centring each line on its own shears the spectrum: Qt measures a
+              // line without its trailing spaces, so quiet columns on the right
+              // make that line shorter and it drifts. Align left; the block as a
+              // whole is centred by its parent.
+              horizontalAlignment: Text.AlignLeft
+              visible: false
+              layer.enabled: true
+            }
 
-              spacing: 0
-
-              // Split each row across the spectrum so colour carries frequency
-              // as well as height. One flat colour over the whole field is what
-              // made this read as a single slab.
-              Repeater {
-                model: root.bandCount
-
-                Text {
-                  required property int index
-                  readonly property int span: Math.ceil(spectrumRow.modelData.length / root.bandCount)
-                  readonly property real tone: root.bandCount > 1 ? index / (root.bandCount - 1) : 0
-
-                  text: spectrumRow.modelData.substr(index * span, span)
-                  font.family: Style.fontFamily
-                  font.pixelSize: 20
-                  font.letterSpacing: 1.5
-                  lineHeight: 0.92
-                  color: root.bandColour(tone, spectrumRow.reach, spectrumRow.lower)
-                }
+            Rectangle {
+              id: upperPaint
+              anchors.fill: parent
+              visible: false
+              layer.enabled: true
+              gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.00; color: root.paletteAt(0) }
+                GradientStop { position: 0.25; color: root.paletteAt(1) }
+                GradientStop { position: 0.50; color: root.paletteAt(2) }
+                GradientStop { position: 0.75; color: root.paletteAt(3) }
+                GradientStop { position: 1.00; color: root.paletteAt(4) }
               }
+            }
+
+            OpacityMask {
+              anchors.fill: parent
+              source: upperPaint
+              maskSource: upperText
+            }
+          }
+
+          Item {
+            width: lowerText.implicitWidth
+            height: lowerText.implicitHeight
+            opacity: 0.38
+
+            Text {
+              id: lowerText
+              text: root.frame.lower
+              font.family: Style.fontFamily
+              font.pixelSize: 20
+              lineHeight: 0.92
+              horizontalAlignment: Text.AlignLeft
+              visible: false
+              layer.enabled: true
+            }
+
+            OpacityMask {
+              anchors.fill: parent
+              source: upperPaint
+              maskSource: lowerText
             }
           }
         }

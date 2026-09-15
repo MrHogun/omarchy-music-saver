@@ -4,12 +4,40 @@
   "name": "Music Saver",
   "version": "0.1.0",
   "author": "MrHogun",
-  "description": "Shows a spectrum visualiser instead of the plain screensaver while music is playing.",
+  "description": "Shows the playing track as ASCII art with a live spectrum instead of the plain screensaver.",
   "kinds": [
     "service"
   ],
   "keepLoaded": true,
   "entryPoints": {
     "service": "Service.qml"
+  },
+  "settings": {
+    "defaults": {
+      "style": "ascii",
+      "artWidth": 72
+    },
+    "schema": [
+      {
+        "key": "style",
+        "type": "enum",
+        "options": [
+          "ascii",
+          "blocks"
+        ],
+        "default": "ascii",
+        "label": "Style preset",
+        "description": "ascii draws the cover with a 70-glyph letter ramp; blocks uses shaded block characters."
+      },
+      {
+        "key": "artWidth",
+        "type": "int",
+        "min": 24,
+        "max": 120,
+        "default": 72,
+        "label": "Cover width",
+        "description": "Width of the cover in characters."
+      }
+    ]
   }
 }

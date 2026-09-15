@@ -19,7 +19,7 @@ import sys
 RATE = 22050          # plenty for a 12 kHz top end, and a quarter of the work
 CHUNK = 512           # 43 Hz per bin; the log spacing below hides the coarseness
 BARS = 32
-FPS = 30
+FPS = 20
 LOW_HZ = 45.0
 HIGH_HZ = 12000.0
 FLOOR_DB = -62.0      # below this a band reads as silence
