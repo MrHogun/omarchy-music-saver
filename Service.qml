@@ -729,12 +729,13 @@ Scope {
     timeout: root.idleSeconds
     respectInhibitors: true
     onIsIdleChanged: {
+      // Only idling brings it up. Activity does not take it away, because the
+      // compositor calls a mouse twitch activity and the stock screensaver does
+      // not budge for one; a key does, and the key handler above does that.
       if (isIdle && root.musicPlaying) {
         root.showing = true
         revealAnimation.restart()
       }
-      else if (!isIdle)
-        root.dismiss()
     }
   }
 
@@ -895,23 +896,14 @@ Scope {
           event.accepted = false
       }
 
+      // Clicks land here so they cannot reach whatever is underneath, and a
+      // deliberate click closes the saver. Moving the mouse does not: the stock
+      // screensaver sits in a terminal on `read -n1`, and a mouse that is only
+      // being nudged across the desk produces no character, so it stays up. A
+      // hand brushing the desk should not cost you the view.
       MouseArea {
         anchors.fill: parent
-        hoverEnabled: true
-        property real originX: -1
-        property real originY: -1
         onClicked: root.dismiss()
-        onPositionChanged: mouse => {
-          // A resting hand twitches; only a real move should dismiss.
-          if (originX < 0) {
-            originX = mouse.x
-            originY = mouse.y
-            return
-          }
-          if (Math.abs(mouse.x - originX) > 40 || Math.abs(mouse.y - originY) > 40)
-            root.dismiss()
-        }
-        onVisibleChanged: { originX = -1; originY = -1 }
       }
 
       // The system preset: no alphabet at all. The shell draws its popups as a

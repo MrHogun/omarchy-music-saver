@@ -170,8 +170,9 @@ omarchy-shell music-saver showWhenIdle off   # stop it taking over the screensav
 omarchy-shell music-saver artWidth 88    # widen the cover, live
 ```
 
-It closes on any key, a click, or a mouse move of more than 40 px — enough that
-a resting hand does not dismiss it.
+It closes on any key or a click, and on nothing else. Moving the mouse leaves it
+alone, the way the stock screensaver does: that one sits on `read -n1`, and a
+mouse nudged across the desk produces no character for it to read.
 
 ---
 
