@@ -242,6 +242,16 @@ restart.
 
 ### Colour
 
+<p align="center">
+  <img src="docs/colors-theme.png" width="31%" alt="spectrum in the theme's terminal palette">
+  <img src="docs/colors-accent.png" width="31%" alt="spectrum in the theme's accent colour">
+  <img src="docs/colors-cover.png" width="31%" alt="spectrum in colours taken from the album art">
+</p>
+<p align="center">
+  <em>the same bars, three sources:
+  <code>theme</code> &nbsp;·&nbsp; <code>accent</code> &nbsp;·&nbsp; <code>cover</code></em>
+</p>
+
 | `colors` | Where it comes from |
 |---|---|
 | `theme` | the theme's own terminal palette, green → cyan → magenta → blue → red across the spectrum |
