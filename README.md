@@ -12,6 +12,14 @@ yourself.
 
 ![kind](https://img.shields.io/badge/omarchy-plugin-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
+<p align="center">
+  <img src="docs/dots-cover.png" width="46%" alt="dots style, spectrum in the cover's colours">
+  <img src="docs/ascii-theme.png" width="46%" alt="ascii style, spectrum in the theme's palette">
+</p>
+<p align="center">
+  <em><code>style: dots</code>, <code>colors: cover</code> &nbsp;·&nbsp; <code>style: ascii</code>, <code>colors: theme</code></em>
+</p>
+
 ---
 
 ## Install
@@ -221,6 +229,14 @@ alphabet too — `spectrum: auto` means `bars` under `blocks` and `ascii` under
 
 Both are watched live — edit `shell.json` and the screen is redrawn without a
 restart.
+
+<p align="center">
+  <img src="docs/blocks-theme.png" width="46%" alt="blocks style with the block spectrum">
+  <img src="docs/blocks-wave.png" width="46%" alt="blocks style with the wave spectrum">
+</p>
+<p align="center">
+  <em><code>style: blocks</code> &nbsp;·&nbsp; the same, with <code>spectrum: wave</code></em>
+</p>
 
 ### Colour
 
