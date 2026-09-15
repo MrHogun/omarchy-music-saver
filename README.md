@@ -27,7 +27,17 @@ Try it without waiting out the idle timer:
 omarchy-shell music-saver show
 ```
 
-Remove it with `./install.sh uninstall`.
+The installer also points the menu at it: **System › Screensaver** asks what is
+playing and opens Music Saver when there is music, the stock screensaver when
+there is not — the same choice the idle timer makes. It does that by reusing
+the `system.screensaver` id in
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`, inside a marked block, and
+puts nothing else in that file. A new row could only have landed at the bottom
+of the System menu, under Shutdown: the menu merges Omarchy's rows first and
+appends the user's, so position is not a thing an extension gets to choose.
+
+Remove it with `./install.sh uninstall`, which takes the block back out and
+leaves the stock row behind.
 
 Needs `pw-cat` (PipeWire), `ffmpeg` and `python3` — all of which a normal
 Omarchy install already has.
