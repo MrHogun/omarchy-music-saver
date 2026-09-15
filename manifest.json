@@ -19,7 +19,8 @@
       "spectrum": "auto",
       "colors": "cover",
       "artWidth": 72,
-      "showWhenIdle": true
+      "showWhenIdle": true,
+      "backdrop": "auto"
     },
     "schema": [
       {
@@ -62,6 +63,18 @@
         "default": "cover",
         "label": "Spectrum colours",
         "description": "theme spreads the spectrum across the theme's terminal palette, accent paints it in one colour, cover pulls bright distinct colours out of the album art. The system style ignores this and always uses the theme accent, the way the shell paints its own meters."
+      },
+      {
+        "key": "backdrop",
+        "type": "enum",
+        "options": [
+          "auto",
+          "theme",
+          "dark"
+        ],
+        "default": "auto",
+        "label": "Backdrop",
+        "description": "auto keeps the theme's background while it is dark and falls back to black once the theme turns light; theme always follows the shell background, and the art inverts its polarity on a light one; dark is always black, the way Omarchy's own screensaver pins its terminal."
       },
       {
         "key": "artWidth",

@@ -11,7 +11,13 @@ is halved -- but only after the source's own shape is taken into account. Covers
 are not always square: YouTube Music hands out video thumbnails at 16:9, and
 assuming a square there squashes them.
 
-Usage: art.py <path-or-url> [cols] [blocks|ascii|dots]
+The backdrop decides the polarity. On a dark background ink marks the bright
+parts of the cover, which is how ASCII art has always been read. On a light one
+that is exactly backwards -- pale pixels drawn pale on white are not there at
+all -- so ink marks the dark parts instead and the colours are pushed down
+rather than lifted.
+
+Usage: art.py <path-or-url> [cols] [blocks|ascii|dots] [dark|light]
        art.py <path-or-url> palette [count]   -- print colours, not art
 """
 import colorsys
@@ -89,29 +95,37 @@ def luma_of(r, g, b):
     return (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
 
 
-def lift(r, g, b, luma):
-    """Lift very dark cells so the shape stays visible on a dark backdrop."""
-    scale = 1.0 if luma > 0.25 else 1.0 + (0.25 - luma)
+def lift(r, g, b, luma, on_light=False):
+    """Keep a cell visible against the backdrop it is drawn on.
+
+    Dark backdrop: lift the very dark cells. Light backdrop: hold every cell
+    below the point where its own colour disappears into the page.
+    """
+    if on_light:
+        scale = 1.0 if luma < 0.55 else 0.55 / max(0.01, luma)
+    else:
+        scale = 1.0 if luma > 0.25 else 1.0 + (0.25 - luma)
     rr, gg, bb = (min(255, int(c * scale)) for c in (r, g, b))
     # Quantising to 5 bits a channel is invisible at this size and lets
     # neighbouring cells share a span.
     return f"#{rr & 0xf8:02x}{gg & 0xf8:02x}{bb & 0xf8:02x}"
 
 
-def cells_from_ramp(pixels, ramp):
+def cells_from_ramp(pixels, ramp, on_light=False):
     for row in pixels:
         cells = []
         for r, g, b in row:
             luma = luma_of(r, g, b)
-            glyph = ramp[min(len(ramp) - 1, int(luma * len(ramp)))]
+            ink = 1.0 - luma if on_light else luma
+            glyph = ramp[min(len(ramp) - 1, int(ink * len(ramp)))]
             if glyph == " ":
                 cells.append((None, "&nbsp;"))
                 continue
-            cells.append((lift(r, g, b, luma), html.escape(glyph)))
+            cells.append((lift(r, g, b, luma, on_light), html.escape(glyph)))
         yield cells
 
 
-def stretched(pixels, width, height):
+def stretched(pixels, width, height, on_light=False):
     """Luma per pixel, with the cover's own range opened out to fill 0..1.
 
     One bit per dot has no shades to spare: a cover that lives between 0.1 and
@@ -121,6 +135,8 @@ def stretched(pixels, width, height):
     highlights and black borders) and lifted a little by gamma.
     """
     rows = [[luma_of(*pixels[y][x]) for x in range(width)] for y in range(height)]
+    if on_light:
+        rows = [[1.0 - v for v in row] for row in rows]
     flat = sorted(v for row in rows for v in row)
     lo = flat[int(len(flat) * 0.02)]
     hi = flat[min(len(flat) - 1, int(len(flat) * 0.98))]
@@ -128,9 +144,9 @@ def stretched(pixels, width, height):
     return [[min(1.0, max(0.0, (v - lo) / span)) ** 0.8 for v in row] for row in rows]
 
 
-def dither(pixels, width, height):
+def dither(pixels, width, height, on_light=False):
     """Floyd-Steinberg the image down to one bit, carrying the error along."""
-    rows = stretched(pixels, width, height)
+    rows = stretched(pixels, width, height, on_light)
     on = [[False] * width for _ in range(height)]
     for y in range(height):
         for x in range(width):
@@ -149,9 +165,9 @@ def dither(pixels, width, height):
     return on
 
 
-def cells_from_braille(pixels, cols, rows):
+def cells_from_braille(pixels, cols, rows, on_light=False):
     """One cell per 2x4 block of pixels: dots dithered, colour averaged."""
-    on = dither(pixels, cols * 2, rows * 4)
+    on = dither(pixels, cols * 2, rows * 4, on_light)
     for row in range(rows):
         cells = []
         for col in range(cols):
@@ -172,7 +188,8 @@ def cells_from_braille(pixels, cols, rows):
             r = sum(p[0] for p in lit) / count
             g = sum(p[1] for p in lit) / count
             b = sum(p[2] for p in lit) / count
-            cells.append((lift(r, g, b, luma_of(r, g, b)), chr(0x2800 + bits)))
+            cells.append((lift(r, g, b, luma_of(r, g, b), on_light),
+                          chr(0x2800 + bits)))
         yield cells
 
 
@@ -256,6 +273,7 @@ def main():
 
     cols = int(sys.argv[2]) if len(sys.argv) > 2 else 44
     style = sys.argv[3] if len(sys.argv) > 3 else "blocks"
+    on_light = (sys.argv[4] if len(sys.argv) > 4 else "dark") == "light"
 
     shape = source_shape(path)
     if shape:
@@ -271,12 +289,12 @@ def main():
         pixels = sample(path, cols * 2, rows * 4)
         if pixels is None:
             return 1
-        grid = cells_from_braille(pixels, cols, rows)
+        grid = cells_from_braille(pixels, cols, rows, on_light)
     else:
         pixels = sample(path, cols, rows)
         if pixels is None:
             return 1
-        grid = cells_from_ramp(pixels, RAMPS.get(style, RAMPS["blocks"]))
+        grid = cells_from_ramp(pixels, RAMPS.get(style, RAMPS["blocks"]), on_light)
 
     out = []
     for cells in grid:

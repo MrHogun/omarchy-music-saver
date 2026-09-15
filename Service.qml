@@ -86,6 +86,40 @@ Scope {
     return root.colorSources.indexOf(want) !== -1 ? want : "cover"
   }
 
+  // What the art is drawn on.
+  //
+  // Omarchy's own screensaver pins its terminal to black whatever the theme is
+  // doing -- default/alacritty/screensaver.toml sets background 0x000000, and
+  // the foot config the same -- because a screensaver that lights the whole
+  // panel white at night is not a screensaver. This keeps that rule where it
+  // matters and drops it where it does not: "auto" takes the theme's own
+  // background while it is dark, since a dark theme has already made the
+  // choice and its tint is nicer than flat black, and falls back to black the
+  // moment the theme turns light.
+  //
+  //   auto  -- the theme's background while dark, black once it is light
+  //   theme -- always the theme's background; on a light one the art inverts
+  //   dark  -- always black, the way the stock screensaver does it
+  readonly property var backdrops: ["auto", "theme", "dark"]
+  readonly property string backdrop: {
+    const want = String(root.settings.backdrop || "")
+    return root.backdrops.indexOf(want) !== -1 ? want : "auto"
+  }
+
+  function isLight(colour) {
+    const c = Qt.color(colour)
+    return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) > 0.5
+  }
+
+  readonly property color backdropColor: {
+    if (root.backdrop === "theme")
+      return Color.background
+    if (root.backdrop === "dark")
+      return "#000000"
+    return root.isLight(Color.background) ? "#000000" : Color.background
+  }
+  readonly property bool onLightBackdrop: root.isLight(root.backdropColor)
+
   // Whether idling into the screensaver hands over to this one. Off, it only
   // ever appears when asked for -- the menu entry, or the IPC command.
   readonly property bool showWhenIdle: root.settings.showWhenIdle !== false
@@ -323,9 +357,8 @@ Scope {
   // dark blue on a dark background is not a spectrum, it is a rumour.
   function legible(colour) {
     const c = Qt.color(colour)
-    const bg = Color.background
     const luma = v => 0.299 * v.r + 0.587 * v.g + 0.114 * v.b
-    const onDark = luma(bg) < 0.5
+    const onDark = !root.onLightBackdrop
     const here = luma(c)
     const want = onDark ? 0.45 : 0.55
     if (onDark && here >= want)
@@ -344,22 +377,35 @@ Scope {
   readonly property var palette: {
     if (root.colorSource === "accent")
       return []
-    if (root.colorSource === "cover" && root.coverPalette.length >= 2)
+    if (root.colorSource === "cover" && root.coverPalette.length >= 1)
       return root.coverPalette
-    if (root.colorSource === "cover" && root.coverPalette.length === 1)
-      return []
     return root.themePalette
   }
 
+  // The gradient has five stops; a palette rarely has five colours. Walking
+  // them one per stop and falling through to the accent for the rest is how a
+  // brown cover ended up with a blue top end -- the accent was a colour from
+  // somewhere else entirely. Spread whatever colours there are across all five
+  // stops instead, so a two-colour cover is a two-colour gradient rather than
+  // two colours and a stranger.
   function paletteAt(i) {
     if (root.colorSource === "accent")
       return Color.accent
-    if (root.colorSource === "cover" && root.coverPalette.length === 1)
-      return root.legible(root.coverPalette[0])
-    if (root.palette.length > i)
-      return root.legible(root.palette[i])
-    return Color.accent
+    const stops = root.palette
+    if (!stops || stops.length === 0)
+      return Color.accent
+    if (stops.length === 1)
+      return root.legible(stops[0])
+    const span = (stops.length - 1) * Math.max(0, Math.min(1, i / 4))
+    const at = Math.floor(span)
+    const here = Qt.color(root.legible(stops[at]))
+    const next = Qt.color(root.legible(stops[Math.min(at + 1, stops.length - 1)]))
+    const f = span - at
+    return Qt.rgba(here.r + (next.r - here.r) * f,
+                   here.g + (next.g - here.g) * f,
+                   here.b + (next.b - here.b) * f, 1)
   }
+
   // Frequency across the same five stops the glyph spectrum paints with, so
   // a preset change swaps the drawing and not the colour scheme -- except
   // under the system preset, which is the shell's own language and paints its
@@ -622,6 +668,17 @@ Scope {
       return on ? "on" : "off"
     }
 
+    // omarchy-shell music-saver backdrop dark|theme
+    function backdrop(name: string): string {
+      if (!name)
+        return root.backdrop
+      if (root.backdrops.indexOf(name) === -1)
+        return "unknown backdrop: " + name + " (" + root.backdrops.join(", ") + ")"
+      if (!root.writeSetting("backdrop", name))
+        return "could not write shell.json"
+      return name
+    }
+
     // omarchy-shell music-saver colors theme|accent|cover
     function colors(name: string): string {
       if (!name)
@@ -687,7 +744,8 @@ Scope {
     id: artRender
     command: ["python3", Quickshell.env("HOME")
       + "/.config/omarchy/plugins/mrhogun.music-saver/bin/art.py", root.artUrl,
-      String(root.artWidth), root.style]
+      String(root.artWidth), root.style,
+      root.onLightBackdrop ? "light" : "dark"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -752,7 +810,8 @@ Scope {
   // What the cover on screen was drawn from. A style or width change has to
   // redraw the same track, so key the cache on everything the drawing depends
   // on rather than on the url alone.
-  readonly property string artSignature: root.artUrl + "|" + root.style + "|" + root.artWidth
+  readonly property string artSignature: root.artUrl + "|" + root.style + "|"
+    + root.artWidth + "|" + (root.onLightBackdrop ? "light" : "dark")
 
   function refreshArt() {
     // Track changes can blank the url for a moment, and a pause used to blank it
@@ -812,7 +871,7 @@ Scope {
     id: saver
     visible: root.showing
     anchors { top: true; bottom: true; left: true; right: true }
-    color: Color.background
+    color: root.backdropColor
     WlrLayershell.namespace: "omarchy-music-saver"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None

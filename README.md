@@ -165,6 +165,7 @@ omarchy-shell music-saver config         # the settings in force, as JSON
 omarchy-shell music-saver style ascii    # switch style preset, live
 omarchy-shell music-saver spectrum dots  # switch how the spectrum is drawn
 omarchy-shell music-saver colors cover   # paint it in the cover's colours
+omarchy-shell music-saver backdrop dark  # black backdrop whatever the theme does
 omarchy-shell music-saver showWhenIdle off   # stop it taking over the screensaver
 omarchy-shell music-saver artWidth 88    # widen the cover, live
 ```
@@ -200,6 +201,7 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 | `style` | `ascii`, `blocks`, `dots`, `system` | `dots` | which alphabet draws the cover — or `system`, which uses none |
 | `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots`, `native` | `auto` | how the spectrum is drawn |
 | `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from (the `system` style ignores it) |
+| `backdrop` | `auto`, `theme`, `dark` | `auto` | what the art is drawn on |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 | `showWhenIdle` | `true`, `false` | `true` | whether idling into the screensaver hands over to this one |
 
@@ -273,6 +275,23 @@ restart.
   <em>the same cover with <code>spectrum: wave</code> — a contour instead of bars</em>
 </p>
 
+### Backdrop
+
+Omarchy's own screensaver pins its terminal to black whatever the theme is
+doing — `default/alacritty/screensaver.toml` sets `background = "0x000000"`, and
+the foot config says the same — because a screensaver that lights the whole
+panel white at night is not a screensaver.
+
+`auto` keeps that rule where it matters and drops it where it does not: it takes
+the theme's own background while that background is dark, since a dark theme has
+already made the choice and its tint is nicer than flat black, and falls back to
+black the moment the theme turns light. `dark` is always black. `theme` always
+follows the shell, light themes included — and there the art inverts: ink marks
+the *dark* parts of the cover rather than the bright ones, and colours are held
+below the point where they disappear into the page rather than lifted above the
+point where they disappear into the dark. Drawing pale pixels pale on white is
+not drawing them at all.
+
 ### Colour
 
 <p align="center">
@@ -303,9 +322,12 @@ nothing and nothing. Each survivor is then pushed back up to at least 55%
 saturation and 72% value — averaging a bucket always comes back duller than the
 pixels in it — and the results are sorted by hue so they read as a ramp.
 
-The shell adds the last step, because only it knows the theme: every colour is
-checked against the background's luminance and moved towards white (or, on a
-light theme, towards black) until it is legible. A dark blue on a dark
+The shell adds the last step, because only it knows the backdrop: every colour
+is checked against the backdrop's luminance and moved towards white (or, on a
+light one, towards black) until it is legible. However many colours survive,
+they are spread across all five gradient stops — walking them one per stop and
+falling through to the theme accent for the rest is how a brown cover ended up
+with a blue top end. A dark blue on a dark
 background is not a spectrum, it is a rumour. A cover with no colour in it at
 all — plenty are pure greyscale — falls back to the theme palette.
 
