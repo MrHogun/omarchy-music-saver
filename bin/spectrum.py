@@ -24,7 +24,9 @@ HIGH_HZ = 12000.0
 FLOOR_DB = -62.0      # below this a band reads as silence
 RISE = 0.55           # how fast a bar climbs towards a new peak
 FALL = 0.12           # and how slowly it comes back down
-SPREAD = 1.7          # Monstercat smoothing: how sharply a peak decays sideways
+SPREAD = 2.6          # Monstercat smoothing: higher means neighbours stay more distinct
+AGC_DECAY = 0.996     # how long the auto sensitivity remembers a loud passage
+AGC_MIN = 0.08        # never amplify silence into a full display
 
 
 def default_monitor():
@@ -69,6 +71,21 @@ def fft(samples):
     return samples
 
 
+def a_weight_db(hz):
+    """A-weighting, in dB.
+
+    The ear is far less sensitive to low frequencies, so an unweighted spectrum
+    is all bass: the left of the display slams while the right barely moves.
+    Weighting each band by the standard curve is what spreads the motion out.
+    """
+    f2 = hz * hz
+    num = (12194.0 ** 2) * (f2 ** 2)
+    den = ((f2 + 20.6 ** 2)
+           * math.sqrt((f2 + 107.7 ** 2) * (f2 + 737.9 ** 2))
+           * (f2 + 12194.0 ** 2))
+    return 20.0 * math.log10(num / den) + 2.0
+
+
 def band_edges():
     """Log-spaced band boundaries, as FFT bin indices."""
     edges = []
@@ -96,6 +113,14 @@ def main():
     edges = band_edges()
     window = [0.5 - 0.5 * math.cos(2 * math.pi * i / (CHUNK - 1)) for i in range(CHUNK)]
     levels = [0.0] * BARS
+    # One weight per band, from the geometric centre of the band's frequencies.
+    weights = []
+    for b in range(BARS):
+        centre = math.sqrt(max(1.0, edges[b] * edges[b + 1])) * RATE / CHUNK
+        # Full weighting kills the bottom two octaves outright, which looks
+        # broken; at 60% the bass is present without swamping everything else.
+        weights.append(a_weight_db(centre) * 0.6)
+    loudest = AGC_MIN
     frame_bytes = CHUNK * 4
     # Drop whole frames when the reader falls behind rather than lagging further.
     skip = max(1, int(RATE / (CHUNK * FPS)))
@@ -118,7 +143,7 @@ def main():
                 for k in range(lo, hi):
                     peak = max(peak, abs(spectrum[k]))
                 # Loudness is logarithmic; so is hearing. Map dB onto 0..1.
-                db = 20 * math.log10(peak / (CHUNK / 2) + 1e-12)
+                db = 20 * math.log10(peak / (CHUNK / 2) + 1e-12) + weights[b]
                 value = max(0.0, min(1.0, (db - FLOOR_DB) / -FLOOR_DB))
                 # Bars that snap up and ease down read as music; bars that follow
                 # the signal exactly read as noise.
@@ -137,7 +162,15 @@ def main():
                     if b + d < BARS:
                         smoothed[b + d] = max(smoothed[b + d], levels[b] / weight)
 
-            print(" ".join(f"{v:.3f}" for v in smoothed), flush=True)
+            # Auto sensitivity, the way cava does it: remember how loud things
+            # have been lately and scale to that, so a quiet track still fills
+            # the display and a loud one does not sit pinned at the top.
+            frame_peak = max(smoothed) if smoothed else 0.0
+            loudest = max(frame_peak, loudest * AGC_DECAY, AGC_MIN)
+            gain = 0.92 / loudest
+            scaled = [min(1.0, v * gain) for v in smoothed]
+
+            print(" ".join(f"{v:.3f}" for v in scaled), flush=True)
     except (BrokenPipeError, KeyboardInterrupt):
         pass
     finally:

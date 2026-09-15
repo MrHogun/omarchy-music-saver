@@ -43,8 +43,9 @@ cell is about twice as tall as it is wide — without that the cover comes out
 stretched.
 
 **A mirrored spectrum**, in block glyphs, growing up and down from a centre
-line. Three things borrowed from terminal visualisers make it read as music
-rather than noise:
+line, coloured across the theme's own terminal palette -- cool in the bass,
+warm at the top. Five things borrowed from people who have done this well make
+it read as music rather than noise:
 
 - *Monstercat smoothing* — each bar pushes its neighbours up, falling off with
   distance. `cava`'s trick; without it 32 narrow bars twitch like needles.
@@ -52,7 +53,15 @@ rather than noise:
   recent maximum and sinks more slowly than the bar. `cli-visualizer` calls this
   falloff, and it is what turns a spectrum into rhythm.
 - *Attack and decay* — bars snap up and ease down, rather than tracking the
-  signal exactly.
+  signal exactly. Showing a raw FFT is the classic mistake: it flickers and
+  never lines up with what you hear.
+- *A-weighting* — the ear is far less sensitive to low frequencies, so an
+  unweighted spectrum is all bass: the left slams while the right barely moves.
+  Each band is weighted by the standard curve, at 60% strength because the full
+  curve kills the bottom two octaves outright.
+- *Auto sensitivity* — cava's `autosens`. The analyser remembers how loud the
+  last few seconds were and scales to that, so a quiet track still fills the
+  display and a loud one does not sit pinned at the top.
 
 **A decrypt intro.** The title and artist land as scrambled glyphs and resolve
 into themselves over about a second — the same effect Omarchy's stock
@@ -60,9 +69,19 @@ screensaver uses on its wordmark (`ttfx decrypt`).
 
 **Track position** as a rule with a marker, in the same block glyphs.
 
-Everything is drawn in the shell's monospace font and coloured from the active
-theme (`Color.accent`, `Color.foreground`, `Color.muted`, `Color.background`),
-so switching themes with `omarchy theme set` recolours it with no further work.
+**Colour comes from the theme, all of it.** The shell surfaces five colours to
+QML, and in most themes `accent` sits right next to `urgent` -- a gradient
+between them is barely a gradient. So this reads the theme's `colors.toml`
+directly and spreads the spectrum across its terminal palette
+(green → cyan → magenta → blue → red), with height lifting each towards the
+foreground so peaks read as hot. The file is watched, so `omarchy theme set`
+recolours everything with no further work.
+
+**It wakes on the same keys the stock screensaver wakes on, and no others.**
+That one waits on `read -n1` -- a character from stdin -- so volume and
+brightness keys never reach it: they are `XF86` binds with `locked = true`,
+handled by the compositor, producing no text. This matches that, so the volume
+can be changed or a track skipped without losing the view.
 
 ---
 

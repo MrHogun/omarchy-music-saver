@@ -30,6 +30,35 @@ Scope {
   readonly property string peakDown: "\u2581"  // lower one eighth block
   readonly property real peakFall: 0.012
 
+  readonly property int bandCount: 8
+
+  // Frequency picks the colour, height picks how bright it burns, and the
+  // lower half is a reflection rather than a second spectrum.
+  function bandColour(tone, reach, lower) {
+    let base
+    if (root.palette.length >= 2) {
+      const span = (root.palette.length - 1) * Math.min(0.999, tone)
+      const stop = Math.floor(span)
+      base = Qt.tint(root.palette[stop],
+                     Qt.rgba(0, 0, 0, 0))
+      const next = Qt.color(root.palette[stop + 1])
+      const here = Qt.color(root.palette[stop])
+      const t = span - stop
+      base = Qt.rgba(here.r + (next.r - here.r) * t,
+                     here.g + (next.g - here.g) * t,
+                     here.b + (next.b - here.b) * t, 1)
+    } else {
+      base = Color.accent
+    }
+    // Tips lift towards the foreground so peaks read as hot.
+    const lift = reach * 0.45
+    return Qt.rgba(
+      base.r + (Color.foreground.r - base.r) * lift,
+      base.g + (Color.foreground.g - base.g) * lift,
+      base.b + (Color.foreground.b - base.b) * lift,
+      (lower ? 0.38 : 1.0) * (1.0 - 0.2 * reach))
+  }
+
   function glyphFor(cell) {
     if (cell >= 1)
       return blocks[8]
@@ -73,10 +102,10 @@ Scope {
       lines.push(line)
     }
 
-    return lines.join("\n")
+    return lines
   }
 
-  property string frame: render()
+  property var frameRows: render()
   onLevelsChanged: {
     const next = []
     for (let i = 0; i < root.barCount; i++) {
@@ -89,7 +118,7 @@ Scope {
     for (let i = 0; i < root.barCount; i++)
       sum += root.levels[i] || 0
     root.overallLevel = Math.min(1, sum / root.barCount * 3)
-    frame = render()
+    frameRows = render()
   }
   property bool showing: false
 
@@ -182,6 +211,35 @@ Scope {
     repeat: true
     running: root.showing
     onTriggered: if (root.player && root.player.positionSupported) root.player.positionChanged()
+  }
+
+  // The shell's Color singleton carries foreground, background, accent, urgent
+  // and muted -- and in most themes accent sits right next to urgent, so a
+  // gradient between them is barely a gradient at all. The theme itself ships a
+  // full terminal palette, so read that and spread the spectrum across it.
+  property var palette: []
+
+  FileView {
+    id: themeColors
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/colors.toml"
+    watchChanges: true
+    onLoaded: {
+      const found = {}
+      for (const line of text().split("\n")) {
+        const match = line.match(/^\s*([a-z_]+)\s*=\s*"(#[0-9a-fA-F]{6})"/)
+        if (match)
+          found[match[1]] = match[2]
+      }
+      // Cool to warm, which is the direction a spectrum reads in.
+      const order = ["green", "cyan", "magenta", "blue", "red"]
+      const ramp = []
+      for (const name of order) {
+        if (found[name])
+          ramp.push(found[name])
+      }
+      root.palette = ramp.length >= 2 ? ramp : []
+    }
+    onLoadFailed: root.palette = []
   }
 
   FileView {
@@ -291,7 +349,20 @@ Scope {
     Item {
       anchors.fill: parent
       focus: root.showing
-      Keys.onPressed: root.dismiss()
+      // Wake on the same keys the stock screensaver wakes on, and no others.
+      // That one waits on `read -n1`, a character from stdin, so volume and
+      // brightness keys never reach it -- they are XF86 binds with locked=true,
+      // handled by the compositor and producing no text. Matching that means
+      // the volume can be changed, or a track skipped, without losing the view.
+      Keys.onPressed: event => {
+        const navigation = [Qt.Key_Escape, Qt.Key_Return, Qt.Key_Enter,
+                            Qt.Key_Space, Qt.Key_Backspace, Qt.Key_Tab]
+        const printable = event.text.length > 0 && event.text.charCodeAt(0) >= 0x20
+        if (printable || navigation.indexOf(event.key) !== -1)
+          root.dismiss()
+        else
+          event.accepted = false
+      }
 
       MouseArea {
         anchors.fill: parent
@@ -328,17 +399,49 @@ Scope {
           horizontalAlignment: Text.AlignHCenter
         }
 
-        // The spectrum, as text. A monospace family is what makes the columns
-        // line up, and Style.fontFamily is whatever the user's theme picked.
-        Text {
+        // The spectrum, a row at a time. Drawing it as one block of text makes
+        // a single flat slab; row by row, each line can carry its own colour and
+        // weight, which is what gives the shape any depth.
+        Column {
           anchors.horizontalCenter: parent.horizontalCenter
-          text: root.frame
-          color: Color.accent
-          font.family: Style.fontFamily
-          font.pixelSize: 22
-          font.hintingPreference: Font.PreferNoHinting
-          lineHeight: 0.92
-          textFormat: Text.PlainText
+          spacing: 0
+
+          Repeater {
+            model: root.frameRows
+
+            Row {
+              id: spectrumRow
+              required property int index
+              required property string modelData
+
+              readonly property int half: root.rowCount
+              readonly property bool lower: index >= half
+              // Distance from the centre line, 0 at the base out to 1 at the tip.
+              readonly property real reach: (lower ? index - half + 1 : half - index) / half
+
+              spacing: 0
+
+              // Split each row across the spectrum so colour carries frequency
+              // as well as height. One flat colour over the whole field is what
+              // made this read as a single slab.
+              Repeater {
+                model: root.bandCount
+
+                Text {
+                  required property int index
+                  readonly property int span: Math.ceil(spectrumRow.modelData.length / root.bandCount)
+                  readonly property real tone: root.bandCount > 1 ? index / (root.bandCount - 1) : 0
+
+                  text: spectrumRow.modelData.substr(index * span, span)
+                  font.family: Style.fontFamily
+                  font.pixelSize: 20
+                  font.letterSpacing: 1.5
+                  lineHeight: 0.92
+                  color: root.bandColour(tone, spectrumRow.reach, spectrumRow.lower)
+                }
+              }
+            }
+          }
         }
 
         Column {
