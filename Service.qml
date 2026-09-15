@@ -538,6 +538,21 @@ Scope {
     return line
   }
 
+  // The stock screensaver hides the pointer for as long as it is up --
+  //   hyprctl eval 'hl.config({ cursor = { invisible = true } })'
+  // with the older `hyprctl keyword` as a fallback -- and puts it back on the
+  // way out, including from its signal traps. A cursor parked in the middle of
+  // the artwork is exactly as distracting here, so this does the same, and the
+  // restore also runs if the shell tears this plugin down while it is showing.
+  function setCursorHidden(hidden) {
+    const value = hidden ? "true" : "false"
+    Quickshell.execDetached(["bash", "-c",
+      "hyprctl eval 'hl.config({ cursor = { invisible = " + value + " } })' &>/dev/null"
+      + " || hyprctl keyword cursor:invisible " + value + " &>/dev/null || true"])
+  }
+
+  Component.onDestruction: if (root.showing) root.setCursorHidden(false)
+
   function dismiss() {
     root.showing = false
   }
@@ -846,7 +861,10 @@ Scope {
 
   onArtSignatureChanged: refreshArt()
 
-  onShowingChanged: refreshArt()
+  onShowingChanged: {
+    root.setCursorHidden(root.showing)
+    refreshArt()
+  }
 
   // The analyser only runs while the saver is up: no point reading the speakers
   // for a window nobody is looking at.
@@ -881,6 +899,24 @@ Scope {
     Item {
       anchors.fill: parent
       focus: root.showing
+
+      // The stock screensaver exits the moment its window is no longer the
+      // focused one -- `! screensaver_in_focus` in its loop -- so that anything
+      // which takes focus (the lock screen, a window opened by a keybind) is
+      // not left arguing with a fullscreen overlay. Same here, with a beat of
+      // delay so the focus handover at startup does not count as a loss.
+      onActiveFocusChanged: {
+        if (activeFocus)
+          focusGuard.stop()
+        else if (root.showing)
+          focusGuard.restart()
+      }
+
+      Timer {
+        id: focusGuard
+        interval: 400
+        onTriggered: if (root.showing) root.dismiss()
+      }
       // Wake on the same keys the stock screensaver wakes on, and no others.
       // That one waits on `read -n1`, a character from stdin, so volume and
       // brightness keys never reach it -- they are XF86 binds with locked=true,

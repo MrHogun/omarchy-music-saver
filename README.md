@@ -170,9 +170,21 @@ omarchy-shell music-saver showWhenIdle off   # stop it taking over the screensav
 omarchy-shell music-saver artWidth 88    # widen the cover, live
 ```
 
-It closes on any key or a click, and on nothing else. Moving the mouse leaves it
-alone, the way the stock screensaver does: that one sits on `read -n1`, and a
-mouse nudged across the desk produces no character for it to read.
+It matches the stock screensaver's behaviour rather than inventing its own:
+
+- **The pointer is hidden** while it is up (`hl.config({ cursor = { invisible =
+  true } })`, with the older `hyprctl keyword` as a fallback) and restored on the
+  way out, including if the shell tears the plugin down mid-view.
+- **Moving the mouse does nothing.** The stock one sits on `read -n1` and a mouse
+  nudged across the desk produces no character for it to read; a hand brushing
+  the desk should not cost you the view. Only a key or a deliberate click closes
+  it.
+- **Losing focus closes it**, the way `! screensaver_in_focus` ends the stock
+  loop, so the lock screen or a window opened by a keybind is never left arguing
+  with a fullscreen overlay.
+- **Volume and brightness keys are not keys**, for either of them: they are
+  `XF86` binds with `locked = true`, handled by the compositor, and they produce
+  no text.
 
 ---
 
