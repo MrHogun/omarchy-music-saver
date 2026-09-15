@@ -139,6 +139,7 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 | Key | Values | Default | What it does |
 |---|---|---|---|
 | `style` | `ascii`, `blocks` | `ascii` | which ramp draws the cover |
+| `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots` | `auto` | how the spectrum is drawn |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 
 **`ascii`** draws the cover with the classic 70-glyph density ramp
@@ -146,14 +147,18 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 **`blocks`** draws it with the five shaded block glyphs (` ░▒▓█`): flatter, and
 closer to a photograph at small sizes.
 
-The preset carries the whole screen, not just the cover. The block spectrum
-fills each cell from the bottom in eighths (`▁▂▃▄▅▆▇█`) — the smooth bar
-everyone knows. ASCII cannot move ink inside a cell, so it does what aalib does
-to a whole image and picks a glyph whose ink already sits where the fill would
-be: the upper half climbs `_ . , : ; i` from the baseline and tops out at `|`,
-the reflection hangs `' " ^ : ; !` from the top of its cell, the falloff
-markers become `-` and `_`, and the progress rule becomes `---o---`. A full
-cell is a bar, so it gets the one glyph that *is* a bar.
+The preset carries the whole screen: on `ascii` the falloff markers become `-`
+and `_`, the progress rule becomes `---o---`, and the spectrum switches
+alphabet too — `spectrum: auto` means `bars` under `blocks` and `ascii` under
+`ascii`. Name one explicitly to mix them:
+
+| `spectrum` | Draws | Idea |
+|---|---|---|
+| `bars` | `▁▂▃▄▅▆▇█` | eighths of a cell filled from the bottom — the smooth bar everyone knows |
+| `ascii` | `_ . , : ; i \|` up, `' " ^ : ; ! \|` down | ASCII cannot move ink inside a cell, so pick a glyph whose ink already sits where the fill would be — aalib's trick, per cell. A full cell is a bar, so it gets the one glyph that *is* a bar |
+| `density` | `. , : ; = + * #` | the other ASCII tradition: weight of ink, not position. Reads as a heat map |
+| `wave` | `_ / \ \|` | a contour tracing the top of the spectrum, risers drawn in so the line never breaks — an oscilloscope rather than a bar chart |
+| `dots` | `⣀⣤⣶⣿` / `⠉⠛⠿⣿` | braille packs four rows into a cell, the trick btop and gotop use for graphs smoother than the terminal grid allows. Reads as an LED equaliser |
 
 Both are watched live — edit `shell.json` and the screen is redrawn without a
 restart.

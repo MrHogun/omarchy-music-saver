@@ -79,37 +79,75 @@ Scope {
   // -- the trick cli-visualizer calls falloff, and the thing that makes a
   // spectrum read as rhythm rather than noise.
   //
-  // Which glyphs do the drawing follows the style preset, so the whole screen
-  // speaks one alphabet. The block ramp fills a cell from the bottom in eighths,
-  // which is the smooth bar everyone knows. The ascii ramp cannot move within
-  // the cell, so it says the same thing the way ASCII art has always said it:
-  // by density, each step heavier than the last.
+  // How it is drawn is a setting of its own, defaulting to whatever the style
+  // preset implies. Every variant below is one line of the same data; they
+  // differ only in which alphabet says it.
+
+  // Blocks fill a cell from the bottom in eighths: the smooth bar everyone
+  // knows, and the reason terminal visualisers look like they do.
   readonly property var rampBlocks: [" ", "\u2581", "\u2582", "\u2583", "\u2584",
                                      "\u2585", "\u2586", "\u2587", "\u2588"]
 
-  // The block ramp fills a cell from the bottom in eighths. ASCII cannot move
-  // ink within a cell -- but it can choose a glyph whose ink already sits where
-  // the fill would be, which is the same trick aalib plays on a whole image.
-  // So the upper half climbs from glyphs that rest on the baseline to ones that
-  // stand full height, and the reflection hangs from the top of its cell
-  // instead. A full cell is a bar, so it gets the one glyph that is a bar.
+  // ASCII cannot move ink within a cell -- but it can pick a glyph whose ink
+  // already sits where the fill would be, which is the trick aalib plays on a
+  // whole image. The upper half climbs from glyphs resting on the baseline to
+  // ones standing full height; the reflection hangs from the top of its cell. A
+  // full cell is a bar, so it gets the one glyph that is a bar.
   readonly property var rampAsciiUp: [" ", "_", ".", ",", ":", ";", "i", "|", "|"]
   readonly property var rampAsciiDown: [" ", "'", "\"", "^", ":", ";", "!", "|", "|"]
 
+  // The other way ASCII has always shown a quantity: by weight of ink, with no
+  // regard for where in the cell it lands. Reads as a heat map more than a bar.
+  readonly property var rampDensity: [" ", ".", ",", ":", ";", "=", "+", "*", "#"]
+
+  // Braille packs four rows into one cell, which is how btop and gotop draw
+  // graphs that look smoother than the terminal grid should allow.
+  readonly property var rampDotsUp: [" ", "\u2840", "\u2844", "\u28c0", "\u28e4",
+                                     "\u28f6", "\u28f6", "\u28ff", "\u28ff"]
+  readonly property var rampDotsDown: [" ", "\u2809", "\u2811", "\u2819", "\u281b",
+                                       "\u283f", "\u283f", "\u28ff", "\u28ff"]
+
+  readonly property var spectrumStyles: ["bars", "ascii", "density", "wave", "dots"]
+
+  readonly property string spectrumStyle: {
+    const want = String(root.settings.spectrum || "")
+    if (root.spectrumStyles.indexOf(want) !== -1)
+      return want
+    return root.style === "ascii" ? "ascii" : "bars"
+  }
+
   function rampFor(lower) {
-    if (root.style !== "ascii")
-      return root.rampBlocks
-    return lower ? root.rampAsciiDown : root.rampAsciiUp
+    switch (root.spectrumStyle) {
+    case "ascii":   return lower ? root.rampAsciiDown : root.rampAsciiUp
+    case "density": return root.rampDensity
+    case "dots":    return lower ? root.rampDotsDown : root.rampDotsUp
+    default:        return root.rampBlocks
+    }
   }
 
   // The falloff marker rides above the bar, so it wants a glyph that sits high
   // in its cell; its reflection wants one that sits low.
-  readonly property string peakUp: root.style === "ascii" ? "-" : "\u2594"
-  readonly property string peakDown: root.style === "ascii" ? "_" : "\u2581"
+  readonly property string peakUp: {
+    switch (root.spectrumStyle) {
+    case "ascii":   return "-"
+    case "density": return "-"
+    case "dots":    return "\u2809"
+    default:        return "\u2594"
+    }
+  }
+  readonly property string peakDown: {
+    switch (root.spectrumStyle) {
+    case "ascii":   return "_"
+    case "density": return "-"
+    case "dots":    return "\u2840"
+    default:        return "\u2581"
+    }
+  }
   readonly property real peakFall: 0.012
 
   // A preset change has to redraw the current frame, not wait for the next one:
   // the analyser only runs while the saver is up.
+  onSpectrumStyleChanged: root.frame = root.render()
   onStyleChanged: root.frame = root.render()
 
   readonly property int bandCount: 4
@@ -150,7 +188,57 @@ Scope {
     return " "
   }
 
+  // A contour rather than a bar chart: one glyph per column tracing the top of
+  // the spectrum, sloping into its neighbours the way an oscilloscope trace
+  // does. The oldest way to draw a curve in text, and the quietest.
+  function renderWave() {
+    const upper = []
+    const lower = []
+    const tops = []
+    for (let col = 0; col < root.barCount; col++)
+      tops.push(Math.max(1, Math.ceil((root.levels[col] || 0) * root.rowCount)))
+
+    function glyphAt(col, fromCentre, lower) {
+      const here = tops[col]
+      const before = col > 0 ? tops[col - 1] : here
+      const after = col < root.barCount - 1 ? tops[col + 1] : here
+      if (fromCentre === here) {
+        const rise = (after - before) / 2
+        if (rise > 0.5) return lower ? "\\" : "/"
+        if (rise < -0.5) return lower ? "/" : "\\"
+        return lower ? "-" : "_"
+      }
+      // A step of more than one row leaves a gap the eye reads as a broken
+      // line, so the riser between two columns is drawn in.
+      const drop = Math.max(before, after)
+      if (fromCentre < here && fromCentre > Math.min(before, after)
+          && fromCentre < drop)
+        return "|"
+      return " "
+    }
+
+    for (let row = 0; row < root.rowCount; row++) {
+      const fromCentre = root.rowCount - row
+      let line = ""
+      for (let col = 0; col < root.barCount; col++)
+        line += glyphAt(col, fromCentre, false) + " "
+      upper.push(line)
+    }
+
+    for (let row = 0; row < root.rowCount; row++) {
+      const fromCentre = row + 1
+      let line = ""
+      for (let col = 0; col < root.barCount; col++)
+        line += glyphAt(col, fromCentre, true) + " "
+      lower.push(line)
+    }
+
+    return { upper: upper.join("\n"), lower: lower.join("\n") }
+  }
+
   function render() {
+    if (root.spectrumStyle === "wave")
+      return root.renderWave()
     const upper = []
     const lower = []
 
@@ -411,6 +499,17 @@ Scope {
     // omarchy-shell music-saver config -> the values in force
     function config(): string {
       return JSON.stringify(root.settings)
+    }
+
+    // omarchy-shell music-saver spectrum bars|ascii|density|wave|dots|auto
+    function spectrum(name: string): string {
+      if (!name)
+        return root.spectrumStyle
+      if (name !== "auto" && root.spectrumStyles.indexOf(name) === -1)
+        return "unknown spectrum: " + name + " (auto, " + root.spectrumStyles.join(", ") + ")"
+      if (!root.writeSetting("spectrum", name))
+        return "could not write shell.json"
+      return name
     }
 
     // omarchy-shell music-saver style ascii|blocks

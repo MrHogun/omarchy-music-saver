@@ -15,7 +15,8 @@
   "settings": {
     "defaults": {
       "style": "ascii",
-      "artWidth": 72
+      "artWidth": 72,
+      "spectrum": "auto"
     },
     "schema": [
       {
@@ -28,6 +29,21 @@
         "default": "ascii",
         "label": "Style preset",
         "description": "ascii draws the cover with a 70-glyph letter ramp; blocks uses shaded block characters."
+      },
+      {
+        "key": "spectrum",
+        "type": "enum",
+        "options": [
+          "auto",
+          "bars",
+          "ascii",
+          "density",
+          "wave",
+          "dots"
+        ],
+        "default": "auto",
+        "label": "Spectrum",
+        "description": "How the spectrum is drawn. auto follows the style preset: bars for blocks, ascii for ascii."
       },
       {
         "key": "artWidth",
