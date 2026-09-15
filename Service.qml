@@ -859,13 +859,19 @@ Scope {
         id: card
         visible: root.style === "system"
         anchors.centerIn: parent
-        width: Style.space(720)
+        // A panel is sized for a corner of the screen; a screensaver has the
+        // whole of it. Everything inside is multiplied by how much bigger this
+        // card is than the panel it is modelled on, so the proportions the
+        // shell's own popups have survive the enlargement.
+        readonly property real k: width / Style.space(720)
+
+        width: Math.round(Math.min(parent.width * 0.68, Style.space(1280)))
         height: cardColumn.implicitHeight + contentTopInset + contentBottomInset
         radius: Style.cornerRadius
         color: Util.alpha(Color.background, 0.97)
         borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border,
-                                       Math.max(1, Style.space(2)))
-        padding: Style.spacing.panelPadding
+                                       Math.max(1, Math.round(Style.space(2) * k)))
+        padding: Math.round(Style.spacing.panelPadding * k)
 
         Column {
           id: cardColumn
@@ -875,7 +881,7 @@ Scope {
           anchors.topMargin: card.contentTopInset
           anchors.leftMargin: card.contentLeftInset
           anchors.rightMargin: card.contentRightInset
-          spacing: Style.spacing.panelGap
+          spacing: Math.round(Style.spacing.panelGap * card.k)
 
           // Hero: the cover as an image in a bordered square, the way the media
           // bar widget already draws it, and the labels beside it.
@@ -885,15 +891,15 @@ Scope {
 
             BorderSurface {
               id: cover
-              width: Style.space(140)
+              width: Math.round(Style.space(140) * card.k)
               height: width
-              radius: Style.spacing.labelGap
+              radius: Math.round(Style.spacing.labelGap * card.k)
               color: Style.normalFillFor(Color.foreground, Color.accent)
               borderSpec: Border.controlSpec("normal", Color.foreground, Color.accent)
 
               Image {
                 anchors.fill: parent
-                anchors.margins: Style.space(2)
+                anchors.margins: Math.max(1, Math.round(Style.space(2) * card.k))
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: false
@@ -907,17 +913,17 @@ Scope {
                 text: "\u{f075a}"
                 color: Color.foreground
                 font.family: Style.font.family
-                font.pixelSize: Style.font.displayLarge
+                font.pixelSize: Math.round(Style.font.displayLarge * card.k)
               }
             }
 
             Column {
               id: heroLabels
               anchors.left: cover.right
-              anchors.leftMargin: Style.space(14)
+              anchors.leftMargin: Math.round(Style.space(14) * card.k)
               anchors.right: parent.right
               anchors.verticalCenter: cover.verticalCenter
-              spacing: Style.space(2)
+              spacing: Math.round(Style.space(2) * card.k)
 
               Text {
                 width: parent.width
@@ -926,7 +932,7 @@ Scope {
                 elide: Text.ElideRight
                 color: Color.foreground
                 font.family: Style.font.family
-                font.pixelSize: Style.font.display
+                font.pixelSize: Math.round(Style.font.display * card.k)
               }
 
               Text {
@@ -936,14 +942,14 @@ Scope {
                 elide: Text.ElideRight
                 color: Qt.darker(Color.foreground, 1.4)
                 font.family: Style.font.family
-                font.pixelSize: Style.font.subtitle
+                font.pixelSize: Math.round(Style.font.subtitle * card.k)
               }
             }
           }
 
           Rectangle {
             width: parent.width
-            height: Math.max(1, Style.space(1))
+            height: Math.max(1, Math.round(Style.space(1) * card.k))
             color: Util.alpha(Color.foreground, 0.12)
           }
 
@@ -951,9 +957,9 @@ Scope {
             text: "SPECTRUM"
             color: Qt.darker(Color.foreground, 1.4)
             font.family: Style.font.family
-            font.pixelSize: Style.font.caption
+            font.pixelSize: Math.round(Style.font.caption * card.k)
             font.bold: true
-            topPadding: Math.ceil(Style.font.caption * 0.15)
+            topPadding: Math.ceil(Style.font.caption * card.k * 0.15)
           }
 
           // Bars as rectangles rather than glyphs. The model is the bar count,
@@ -962,11 +968,29 @@ Scope {
           Item {
             id: bars
             width: parent.width
-            height: Style.space(190)
+            height: Math.round(Style.space(190) * card.k)
 
-            readonly property real gap: Style.space(3)
+            readonly property real gap: Math.round(Style.space(3) * card.k)
+            readonly property int segments: 16
             readonly property real barWidth:
               Math.max(1, (width - gap * (root.barCount - 1)) / root.barCount)
+
+            // Cut the bars into segments the way PanelSlider cuts notches into
+            // its track: lines in the card's own background colour, drawn over
+            // the top. Sixteen rectangles for the whole spectrum rather than
+            // sixteen per column, and the meter reads as an LED ladder.
+            Repeater {
+              model: bars.segments
+
+              Rectangle {
+                required property int index
+                z: 2
+                width: bars.width
+                height: Math.max(1, Math.round(Style.space(2) * card.k))
+                color: card.color
+                y: Math.round((index + 1) * bars.height / bars.segments) - height / 2
+              }
+            }
 
             Repeater {
               model: root.barCount
@@ -982,13 +1006,26 @@ Scope {
                 readonly property color tone:
                   root.spectrumColour(index / Math.max(1, root.barCount - 1))
 
+                // The empty slot the bar rises in, at the same alpha a
+                // PanelSlider gives the unfilled part of its track. It keeps
+                // the quiet end of the spectrum from disappearing into the
+                // card, which is what a mixer's channel strips do.
+                Rectangle {
+                  anchors.fill: parent
+                  radius: Math.min(Style.cornerRadius, width / 2)
+                  color: Util.alpha(Color.foreground, 0.0)
+                }
+
                 // The bar itself, growing from the baseline.
                 Rectangle {
                   anchors.bottom: parent.bottom
                   width: parent.width
-                  radius: width / 2
+                  // The shell's rounding, not a pill: Style.cornerRadius
+                  // mirrors Hyprland's decoration:rounding, so the bars are as
+                  // square or as round as every other corner on the desktop.
+                  radius: Math.min(Style.cornerRadius, width / 2)
                   color: parent.tone
-                  height: Math.max(Style.space(3), parent.level * bars.height)
+                  height: Math.max(Style.space(3) * card.k, parent.level * bars.height)
                   Behavior on height {
                     NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
                   }
@@ -998,8 +1035,8 @@ Scope {
                 // plain bar chart does not.
                 Rectangle {
                   width: parent.width
-                  height: Math.max(1, Style.space(2))
-                  radius: height / 2
+                  height: Math.max(1, Math.round(Style.space(2) * card.k))
+                  radius: Math.min(Style.cornerRadius, height / 2)
                   color: parent.tone
                   opacity: 0.55
                   y: Math.max(0, bars.height - parent.peak * bars.height - height)
@@ -1014,7 +1051,7 @@ Scope {
           // Position, drawn the way PanelSlider draws a track.
           Item {
             width: parent.width
-            height: Style.spacing.controlHeight
+            height: Math.round(Style.spacing.controlHeight * card.k)
             opacity: root.trackLength > 0 ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 200 } }
 
@@ -1025,7 +1062,7 @@ Scope {
               text: root.clock(root.trackPosition)
               color: Qt.darker(Color.foreground, 1.4)
               font.family: Style.font.family
-              font.pixelSize: Style.font.caption
+              font.pixelSize: Math.round(Style.font.caption * card.k)
             }
 
             Text {
@@ -1035,7 +1072,7 @@ Scope {
               text: root.clock(root.trackLength)
               color: Qt.darker(Color.foreground, 1.4)
               font.family: Style.font.family
-              font.pixelSize: Style.font.caption
+              font.pixelSize: Math.round(Style.font.caption * card.k)
             }
 
             Rectangle {
@@ -1043,9 +1080,9 @@ Scope {
               anchors.verticalCenter: parent.verticalCenter
               anchors.left: elapsed.right
               anchors.right: total.left
-              anchors.leftMargin: Style.spacing.controlGap
-              anchors.rightMargin: Style.spacing.controlGap
-              height: Math.max(4, Math.round(Style.spacing.controlHeight * 0.11))
+              anchors.leftMargin: Math.round(Style.spacing.controlGap * card.k)
+              anchors.rightMargin: Math.round(Style.spacing.controlGap * card.k)
+              height: Math.max(4, Math.round(Style.spacing.controlHeight * 0.11 * card.k))
               radius: height / 2
               color: Util.alpha(Color.foreground, 0.2)
 

@@ -222,11 +222,25 @@ that are actually lit. A newspaper halftone, in a terminal.
 language — the way the audio, network and bluetooth panels are drawn — and puts
 the same card on screen at screensaver size: a `BorderSurface` over the
 background at 0.97 with the `popups` border spec, a hero row of the cover as a
-real image beside the labels, a separator, a section header, bars as rounded
-rectangles, and a position track built the way `PanelSlider` builds one. Every
-dimension goes through `Style.space()` and every colour through the `Color`
-tokens, so it follows the theme's rounding, spacing and font scale the way the
-rest of the desktop does.
+real image beside the labels, a separator, a section header, the spectrum, and a
+position track built the way `PanelSlider` builds one.
+
+The bars are cut into an LED ladder by the same trick `PanelSlider` uses for its
+notches — lines in the card's own background colour drawn over the top, sixteen
+for the whole spectrum rather than sixteen per column. Their corners are
+`Style.cornerRadius`, which mirrors Hyprland's `decoration:rounding`, so they are
+as square or as round as every other corner on the desktop.
+
+A panel is sized for a corner of the screen and a screensaver has all of it, so
+the card takes 68% of the width and everything inside is multiplied by how much
+bigger it is than the panel it is modelled on — the proportions survive the
+enlargement. Every dimension goes through `Style.space()` and every colour
+through the `Color` tokens, so it follows the theme's spacing and font scale
+too.
+
+Pair it with `colors: accent` for the flat theme accent — `Color.accent`, the
+same colour the shell fills its sliders and selections with — instead of a
+gradient.
 
 <p align="center">
   <img src="docs/system.png" width="70%" alt="the system preset: an Omarchy panel card at screensaver size">
