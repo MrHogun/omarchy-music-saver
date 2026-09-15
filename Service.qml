@@ -58,9 +58,15 @@ Scope {
       root.manifest ? root.manifest.id : "mrhogun.music-saver", patch)
   }
 
-  // "ascii" draws the cover with the classic 70-glyph density ramp; "blocks"
-  // uses the five shaded block glyphs.
-  readonly property string style: root.settings.style === "blocks" ? "blocks" : "ascii"
+  // The style preset decides the alphabet the whole screen speaks: "ascii" the
+  // classic 70-glyph density ramp, "blocks" the five shaded blocks, "dots"
+  // braille -- eight dots to a cell, so the cover is dithered rather than
+  // ramped.
+  readonly property var styles: ["ascii", "blocks", "dots"]
+  readonly property string style: {
+    const want = String(root.settings.style || "")
+    return root.styles.indexOf(want) !== -1 ? want : "ascii"
+  }
   readonly property int artWidth: {
     const width = parseInt(root.settings.artWidth)
     return isNaN(width) ? 72 : Math.max(24, Math.min(120, width))
@@ -113,7 +119,11 @@ Scope {
     const want = String(root.settings.spectrum || "")
     if (root.spectrumStyles.indexOf(want) !== -1)
       return want
-    return root.style === "ascii" ? "ascii" : "bars"
+    switch (root.style) {
+    case "dots":   return "dots"
+    case "blocks": return "bars"
+    default:       return "ascii"
+    }
   }
 
   function rampFor(lower) {
@@ -388,8 +398,10 @@ Scope {
 
   // A plain rule with a marker on it, in the same glyphs as everything else.
   function progressLine(width) {
-    const rule = root.style === "ascii" ? "-" : "\u2500"
-    const mark = root.style === "ascii" ? "o" : "\u25c6"
+    const rule = root.style === "ascii" ? "-"
+      : (root.style === "dots" ? "\u2824" : "\u2500")
+    const mark = root.style === "ascii" ? "o"
+      : (root.style === "dots" ? "\u28ff" : "\u25c6")
     if (root.trackLength <= 0)
       return ""
     const ratio = Math.max(0, Math.min(1, root.trackPosition / root.trackLength))
@@ -516,8 +528,8 @@ Scope {
     function style(name: string): string {
       if (!name)
         return root.style
-      if (name !== "ascii" && name !== "blocks")
-        return "unknown style: " + name + " (ascii, blocks)"
+      if (root.styles.indexOf(name) === -1)
+        return "unknown style: " + name + " (" + root.styles.join(", ") + ")"
       if (!root.writeSetting("style", name))
         return "could not write shell.json"
       return name

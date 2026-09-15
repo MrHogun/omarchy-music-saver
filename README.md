@@ -93,7 +93,7 @@ can be changed or a track skipped without losing the view.
 | `manifest.json` | declares the plugin: `kind: service`, `keepLoaded` |
 | `Service.qml` | idle watch, MPRIS, the overlay window, all the drawing |
 | `bin/spectrum.py` | reads the default sink's monitor, prints one line of bar levels per frame |
-| `bin/art.py` | turns the cover into coloured rich text, once per track |
+| `bin/art.py` | turns the cover into coloured rich text — ramped or dithered — once per track |
 
 The spectrum analyser is a plain stdout stream — 32 values in 0..1, about 30
 times a second — and useful on its own:
@@ -138,14 +138,18 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 
 | Key | Values | Default | What it does |
 |---|---|---|---|
-| `style` | `ascii`, `blocks` | `ascii` | which ramp draws the cover |
+| `style` | `ascii`, `blocks`, `dots` | `ascii` | which alphabet draws the cover |
 | `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots` | `auto` | how the spectrum is drawn |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 
 **`ascii`** draws the cover with the classic 70-glyph density ramp
 (`` .'`^",:;Il!i…$@``): shape and texture, a cover that reads as a drawing.
 **`blocks`** draws it with the five shaded block glyphs (` ░▒▓█`): flatter, and
-closer to a photograph at small sizes.
+closer to a photograph at small sizes. **`dots`** does not use a ramp at all:
+braille carries a 2×4 grid of dots per cell, so the cover is sampled eight
+times as densely and turned into a one-bit image — Floyd–Steinberg dithered,
+its own contrast range opened out first, then coloured per cell from the dots
+that are actually lit. A newspaper halftone, in a terminal.
 
 The preset carries the whole screen: on `ascii` the falloff markers become `-`
 and `_`, the progress rule becomes `---o---`, and the spectrum switches
