@@ -1,8 +1,9 @@
 # Music Saver
 
 An Omarchy screensaver for when music is playing: the album art redrawn as
-coloured ASCII, a mirrored spectrum of whatever is actually coming out of the
-speakers, and the track it belongs to.
+coloured text — braille halftone out of the box, ASCII or blocks a setting
+away — a mirrored spectrum of whatever is actually coming out of the speakers,
+painted in the cover's own colours, and the track it belongs to.
 
 Idle with nothing playing and Omarchy's own screensaver still takes over. This
 one only appears when a player reports something is playing.
@@ -35,7 +36,7 @@ Omarchy install already has.
 
 ## What it draws
 
-**Album art as coloured ASCII.** Players cache the cover on disk and point MPRIS
+**Album art as coloured text.** Players cache the cover on disk and point MPRIS
 at it, so this reads a local file rather than the network. `ffmpeg` scales it,
 and each cell gets a character chosen by luminance from the ramp the current
 [style preset](#settings) names, coloured like the pixel it stands for. The height is worked out from the source's own
