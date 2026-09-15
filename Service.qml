@@ -154,6 +154,14 @@ Scope {
   readonly property string title: player ? (player.trackTitle || "") : ""
   readonly property string artist: player ? (player.trackArtist || "") : ""
   readonly property string artUrl: player ? (player.trackArtUrl || "") : ""
+
+  // Between tracks the player reports empty metadata for a moment. Letting that
+  // through empties the labels, the row collapses, and everything above it
+  // jumps down and back. Keep the last real values until new ones arrive.
+  property string heldTitle: ""
+  property string heldArtist: ""
+  onTitleChanged: if (title) heldTitle = title
+  onArtistChanged: if (artist) heldArtist = artist
   property string artHtml: ""
 
   // Omarchy's own screensaver animates its wordmark with ttfx effects --
@@ -417,7 +425,7 @@ Scope {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
-          visible: root.artHtml !== ""
+          opacity: root.artHtml !== "" ? 1 : 0
           text: root.artHtml
           textFormat: Text.RichText
           font.family: Style.fontFamily
@@ -477,14 +485,14 @@ Scope {
 
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.scrambled(root.title)
+            text: root.scrambled(root.heldTitle)
             color: Color.foreground
             font.family: Style.fontFamily
             font.pixelSize: 20
           }
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.scrambled(root.artist)
+            text: root.scrambled(root.heldArtist)
             color: Color.muted
             font.family: Style.fontFamily
             font.pixelSize: 16
@@ -492,8 +500,9 @@ Scope {
 
           Row {
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: root.trackLength > 0
+            opacity: root.trackLength > 0 ? 1 : 0
             spacing: Style.space(12)
+            Behavior on opacity { NumberAnimation { duration: 200 } }
 
             Text {
               text: root.clock(root.trackPosition)
