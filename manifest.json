@@ -4,6 +4,7 @@
   "name": "Musicsaver",
   "version": "1.0.0",
   "author": "MrHogun",
+  "license": "MIT",
   "description": "Turns the screensaver into the album art and a live spectrum while music is playing.",
   "kinds": [
     "service"

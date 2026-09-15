@@ -144,7 +144,8 @@ can be changed or a track skipped without losing the view.
 
 | File | Role |
 |---|---|
-| `manifest.json` | declares the plugin: `kind: service`, `keepLoaded` |
+| `manifest.json` | declares the plugin: `kind: service`, `keepLoaded`, and the settings schema |
+| `preview.png` | the card picture — what Plugin Manager shows for this plugin, from the repo root |
 | `Service.qml` | idle watch, MPRIS, the overlay window, all the drawing |
 | `bin/spectrum.py` | reads the default sink's monitor, prints one line of bar levels per frame |
 | `bin/art.py` | turns the cover into coloured rich text — ramped or dithered — once per track |
