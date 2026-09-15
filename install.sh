@@ -14,16 +14,19 @@ DEST="$CONFIG/plugins/$ID"
 # rather than rewriting it, and uninstall takes exactly that block back out.
 #
 # A new row can only ever land at the bottom of its submenu -- the menu merges
-# the defaults first and appends whatever the user file adds -- and the bottom
-# of System, under Shutdown, is not where this belongs. So instead of adding a
-# row, the block reuses the id of the Screensaver row and gives it an action
-# that asks what is playing first: the music saver when there is music, the
-# stock screensaver when there is not. That is the same choice the idle timer
-# already makes, now made by the menu entry too, in the place it already has.
+# Omarchy's rows first and appends the user's, so an extension does not get to
+# pick a position -- and the bottom of System, under Shutdown, is not where
+# this belongs. So the block reuses the Screensaver id and turns that row into
+# a submenu, which is the one place a row of ours can appear next to it. The
+# music entry hides itself when nothing is playing.
 MENU="$CONFIG/extensions/omarchy-menu.jsonc"
 MENU_BEGIN="// >>> $ID"
 MENU_END="// <<< $ID"
-MENU_ROW='  "system.screensaver": {"icon":"󱄄","label":"Screensaver","description":"Music Saver while something is playing","action":"if [ \"$(omarchy-shell music-saver playing)\" != '"'"'nothing playing'"'"' ]; then omarchy-shell music-saver show; else omarchy-launch-screensaver force; fi"},'
+read -r -d '' MENU_ROWS <<'ROWS' || true
+  "system.screensaver": {"icon":"󱄄","label":"Screensaver"},
+  "system.screensaver.default": {"icon":"󱄄","label":"Default","action":"omarchy-launch-screensaver force"},
+  "system.screensaver.music": {"icon":"󰄨","label":"Musicsaver","description":"Album art and spectrum, while music is playing","action":"omarchy-shell music-saver show","when":"[ \"$(omarchy-shell music-saver playing)\" != 'nothing playing' ]"},
+ROWS
 
 menu_remove() {
   [[ -f $MENU ]] || return 0
@@ -38,12 +41,12 @@ menu_add() {
   # entries of their own. Omarchy strips trailing commas, so one is always safe.
   # Through the environment, not -v: awk expands backslash escapes in a -v
   # value, which would eat the \" that keeps the row valid JSON.
-  MENU_BEGIN="$MENU_BEGIN" MENU_ROW="$MENU_ROW" MENU_END="$MENU_END" \
+  MENU_BEGIN="$MENU_BEGIN" MENU_ROWS="$MENU_ROWS" MENU_END="$MENU_END" \
   awk '
     !placed && /^[[:space:]]*\{/ {
       print
       print ENVIRON["MENU_BEGIN"]
-      print ENVIRON["MENU_ROW"]
+      print ENVIRON["MENU_ROWS"]
       print ENVIRON["MENU_END"]
       placed = 1
       next
@@ -75,6 +78,6 @@ install -m755 "$SRC/bin/art.py" "$SRC/bin/spectrum.py" "$DEST/bin/"
 
 omarchy plugin enable "$ID" >/dev/null 2>&1 || true
 menu_add
-info "System > Screensaver now opens Music Saver while music is playing"
+info "Added to the Omarchy menu: System > Screensaver > Music Saver"
 info "Enabled. Load it with: omarchy restart shell"
 info "Then try it without waiting for the idle timer: omarchy-shell music-saver show"

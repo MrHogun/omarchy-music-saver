@@ -27,17 +27,27 @@ Try it without waiting out the idle timer:
 omarchy-shell music-saver show
 ```
 
-The installer also points the menu at it: **System › Screensaver** asks what is
-playing and opens Music Saver when there is music, the stock screensaver when
-there is not — the same choice the idle timer makes. It does that by reusing
-the `system.screensaver` id in
-`~/.config/omarchy/extensions/omarchy-menu.jsonc`, inside a marked block, and
-puts nothing else in that file. A new row could only have landed at the bottom
-of the System menu, under Shutdown: the menu merges Omarchy's rows first and
-appends the user's, so position is not a thing an extension gets to choose.
+The installer also puts it in the Omarchy menu, under **System › Screensaver**:
 
-Remove it with `./install.sh uninstall`, which takes the block back out and
-leaves the stock row behind.
+```
+Screensaver ›
+   Default       the stock screensaver
+   Musicsaver    this one, shown only while something is playing
+```
+
+That is done by adding a marked block to
+`~/.config/omarchy/extensions/omarchy-menu.jsonc` — the file Omarchy keeps for
+exactly this — which reuses the `system.screensaver` id to turn that row into a
+submenu and hangs two children off it. Nothing else in the file is touched.
+
+It has to be a child rather than a row next to Screensaver: the menu merges
+Omarchy's rows first and appends the user's, and a re-declared id keeps the
+position it already had, so any new id lands at the bottom of its submenu —
+under Shutdown, in this case. A child is the only place next to Screensaver
+that an extension can reach.
+
+Remove it with `./install.sh uninstall`, which takes exactly that block back
+out; the stock row returns on its own, because it was never edited.
 
 Needs `pw-cat` (PipeWire), `ffmpeg` and `python3` — all of which a normal
 Omarchy install already has.
