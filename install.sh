@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Set Music Saver up in Omarchy: copy it in if it is not already there, enable
+# Set Musicsaver up in Omarchy: copy it in if it is not already there, enable
 # it, and add its entry to the Omarchy menu.
 #
 # Two ways in, and this handles both. `omarchy plugin add <git-url>` clones the

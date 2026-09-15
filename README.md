@@ -1,4 +1,4 @@
-# Music Saver
+# Musicsaver
 
 An Omarchy screensaver for when music is playing: the album art redrawn as
 coloured text — braille halftone out of the box, ASCII or blocks a setting

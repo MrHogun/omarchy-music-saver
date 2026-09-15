@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "mrhogun.music-saver",
-  "name": "Music Saver",
-  "version": "0.1.0",
+  "name": "Musicsaver",
+  "version": "1.0.0",
   "author": "MrHogun",
-  "description": "Shows the playing track as ASCII art with a live spectrum instead of the plain screensaver.",
+  "description": "Turns the screensaver into the album art and a live spectrum while music is playing.",
   "kinds": [
     "service"
   ],

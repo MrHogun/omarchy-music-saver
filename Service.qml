@@ -6,7 +6,7 @@ import Quickshell.Services.Mpris
 import qs.Commons
 import Qt5Compat.GraphicalEffects
 
-// Music Saver: while something is playing, idling into the screensaver should
+// Musicsaver: while something is playing, idling into the screensaver should
 // show what is playing rather than a terminal animation.
 //
 // The stock idle service keeps doing its job; this one watches the same idle
