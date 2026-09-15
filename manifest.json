@@ -17,7 +17,8 @@
       "style": "dots",
       "spectrum": "auto",
       "colors": "cover",
-      "artWidth": 72
+      "artWidth": 72,
+      "showWhenIdle": true
     },
     "schema": [
       {
@@ -67,6 +68,13 @@
         "default": 72,
         "label": "Cover width",
         "description": "Width of the cover in characters."
+      },
+      {
+        "key": "showWhenIdle",
+        "type": "bool",
+        "default": true,
+        "label": "Take over the screensaver",
+        "description": "When on, idling into the screensaver shows this instead, as long as something is playing. When off, it only appears when asked for."
       }
     ]
   }

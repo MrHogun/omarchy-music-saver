@@ -6,7 +6,9 @@ away — a mirrored spectrum of whatever is actually coming out of the speakers,
 painted in the cover's own colours, and the track it belongs to.
 
 Idle with nothing playing and Omarchy's own screensaver still takes over. This
-one only appears when a player reports something is playing.
+one only appears when a player reports something is playing — and `showWhenIdle:
+false` keeps it off the idle path entirely, leaving it something you open
+yourself.
 
 ![kind](https://img.shields.io/badge/omarchy-plugin-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -137,6 +139,7 @@ omarchy-shell music-saver config         # the settings in force, as JSON
 omarchy-shell music-saver style ascii    # switch style preset, live
 omarchy-shell music-saver spectrum dots  # switch how the spectrum is drawn
 omarchy-shell music-saver colors cover   # paint it in the cover's colours
+omarchy-shell music-saver showWhenIdle off   # stop it taking over the screensaver
 omarchy-shell music-saver artWidth 88    # widen the cover, live
 ```
 
@@ -172,6 +175,7 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 | `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots` | `auto` | how the spectrum is drawn |
 | `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from |
 | `artWidth` | 24–120 | `72` | cover width in characters |
+| `showWhenIdle` | `true`, `false` | `true` | whether idling into the screensaver hands over to this one |
 
 **`ascii`** draws the cover with the classic 70-glyph density ramp
 (`` .'`^",:;Il!i…$@``): shape and texture, a cover that reads as a drawing.

@@ -84,6 +84,10 @@ Scope {
     return root.colorSources.indexOf(want) !== -1 ? want : "cover"
   }
 
+  // Whether idling into the screensaver hands over to this one. Off, it only
+  // ever appears when asked for -- the menu entry, or the IPC command.
+  readonly property bool showWhenIdle: root.settings.showWhenIdle !== false
+
   readonly property int artWidth: {
     const width = parseInt(root.settings.artWidth)
     return isNaN(width) ? 72 : Math.max(24, Math.min(120, width))
@@ -583,6 +587,19 @@ Scope {
       return lines.join("\n")
     }
 
+    // omarchy-shell music-saver showWhenIdle on|off
+    function showWhenIdle(value: string): string {
+      if (!value)
+        return root.showWhenIdle ? "on" : "off"
+      const on = ["on", "true", "yes", "1"].indexOf(value) !== -1
+      const off = ["off", "false", "no", "0"].indexOf(value) !== -1
+      if (!on && !off)
+        return "showWhenIdle takes on or off"
+      if (!root.writeSetting("showWhenIdle", on))
+        return "could not write shell.json"
+      return on ? "on" : "off"
+    }
+
     // omarchy-shell music-saver colors theme|accent|cover
     function colors(name: string): string {
       if (!name)
@@ -629,7 +646,7 @@ Scope {
   }
 
   IdleMonitor {
-    enabled: root.musicPlaying
+    enabled: root.musicPlaying && root.showWhenIdle
     timeout: root.idleSeconds
     respectInhibitors: true
     onIsIdleChanged: {
