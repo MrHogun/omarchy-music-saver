@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Mpris
 import qs.Commons
+import qs.Ui
 import Qt5Compat.GraphicalEffects
 
 // Musicsaver: while something is playing, idling into the screensaver should
@@ -68,8 +69,9 @@ Scope {
   // The style preset decides the alphabet the whole screen speaks: "ascii" the
   // classic 70-glyph density ramp, "blocks" the five shaded blocks, "dots"
   // braille -- eight dots to a cell, so the cover is dithered rather than
-  // ramped.
-  readonly property var styles: ["ascii", "blocks", "dots"]
+  // ramped. "system" speaks no alphabet at all: it borrows the shell's own
+  // panel language, the way the audio and network popups are drawn.
+  readonly property var styles: ["ascii", "blocks", "dots", "system"]
   readonly property string style: {
     const want = String(root.settings.style || "")
     return root.styles.indexOf(want) !== -1 ? want : "dots"
@@ -134,7 +136,7 @@ Scope {
   readonly property var rampDotsDown: [" ", "\u2809", "\u2811", "\u2819", "\u281b",
                                        "\u283f", "\u283f", "\u28ff", "\u28ff"]
 
-  readonly property var spectrumStyles: ["bars", "ascii", "density", "wave", "dots"]
+  readonly property var spectrumStyles: ["bars", "ascii", "density", "wave", "dots", "native"]
 
   readonly property string spectrumStyle: {
     const want = String(root.settings.spectrum || "")
@@ -143,6 +145,7 @@ Scope {
     switch (root.style) {
     case "dots":   return "dots"
     case "blocks": return "bars"
+    case "system": return "native"
     default:       return "ascii"
     }
   }
@@ -357,6 +360,19 @@ Scope {
       return root.legible(root.palette[i])
     return Color.accent
   }
+  // Frequency across the same five stops the glyph spectrum paints with, so
+  // a preset change swaps the drawing and not the colour scheme.
+  function spectrumColour(t) {
+    const span = 4 * Math.max(0, Math.min(0.999, t))
+    const stop = Math.floor(span)
+    const here = Qt.color(root.paletteAt(stop))
+    const next = Qt.color(root.paletteAt(stop + 1))
+    const f = span - stop
+    return Qt.rgba(here.r + (next.r - here.r) * f,
+                   here.g + (next.g - here.g) * f,
+                   here.b + (next.b - here.b) * f, 1)
+  }
+
   onLevelsChanged: {
     const next = []
     for (let i = 0; i < root.barCount; i++) {
@@ -738,6 +754,11 @@ Scope {
     // until a new one has actually been drawn.
     if (!root.showing || !root.artUrl || root.artSignature === root.artRendered)
       return
+    if (root.style === "system") {
+      // The card shows the cover as an image; nothing to redraw as text.
+      root.artRendered = root.artSignature
+      return
+    }
     root.artRendered = root.artSignature
     // Toggling running twice inside one frame collapses to no change at all,
     // so let the stop settle before asking for the next draw.
@@ -828,8 +849,226 @@ Scope {
         onVisibleChanged: { originX = -1; originY = -1 }
       }
 
+      // The system preset: no alphabet at all. The shell draws its popups as a
+      // BorderSurface over the background at 0.97, a hero row of icon and
+      // labels, a separator, a section header, then content -- audio, network
+      // and bluetooth are all that shape. This is the same card at screensaver
+      // size, so the screensaver looks like the desktop it belongs to rather
+      // than like a terminal.
+      BorderSurface {
+        id: card
+        visible: root.style === "system"
+        anchors.centerIn: parent
+        width: Style.space(720)
+        height: cardColumn.implicitHeight + contentTopInset + contentBottomInset
+        radius: Style.cornerRadius
+        color: Util.alpha(Color.background, 0.97)
+        borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border,
+                                       Math.max(1, Style.space(2)))
+        padding: Style.spacing.panelPadding
+
+        Column {
+          id: cardColumn
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.topMargin: card.contentTopInset
+          anchors.leftMargin: card.contentLeftInset
+          anchors.rightMargin: card.contentRightInset
+          spacing: Style.spacing.panelGap
+
+          // Hero: the cover as an image in a bordered square, the way the media
+          // bar widget already draws it, and the labels beside it.
+          Item {
+            width: parent.width
+            height: Math.max(cover.height, heroLabels.implicitHeight)
+
+            BorderSurface {
+              id: cover
+              width: Style.space(140)
+              height: width
+              radius: Style.spacing.labelGap
+              color: Style.normalFillFor(Color.foreground, Color.accent)
+              borderSpec: Border.controlSpec("normal", Color.foreground, Color.accent)
+
+              Image {
+                anchors.fill: parent
+                anchors.margins: Style.space(2)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+                source: root.artUrl
+                visible: source !== ""
+              }
+
+              Text {
+                anchors.centerIn: parent
+                visible: root.artUrl === ""
+                text: "\u{f075a}"
+                color: Color.foreground
+                font.family: Style.font.family
+                font.pixelSize: Style.font.displayLarge
+              }
+            }
+
+            Column {
+              id: heroLabels
+              anchors.left: cover.right
+              anchors.leftMargin: Style.space(14)
+              anchors.right: parent.right
+              anchors.verticalCenter: cover.verticalCenter
+              spacing: Style.space(2)
+
+              Text {
+                width: parent.width
+                text: root.heldTitle
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: Color.foreground
+                font.family: Style.font.family
+                font.pixelSize: Style.font.display
+              }
+
+              Text {
+                width: parent.width
+                text: root.heldArtist
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: Qt.darker(Color.foreground, 1.4)
+                font.family: Style.font.family
+                font.pixelSize: Style.font.subtitle
+              }
+            }
+          }
+
+          Rectangle {
+            width: parent.width
+            height: Math.max(1, Style.space(1))
+            color: Util.alpha(Color.foreground, 0.12)
+          }
+
+          Text {
+            text: "SPECTRUM"
+            color: Qt.darker(Color.foreground, 1.4)
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            font.bold: true
+            topPadding: Math.ceil(Style.font.caption * 0.15)
+          }
+
+          // Bars as rectangles rather than glyphs. The model is the bar count,
+          // not the levels: handing a Repeater a fresh array rebuilds every
+          // delegate, and at twenty frames a second that is the whole budget.
+          Item {
+            id: bars
+            width: parent.width
+            height: Style.space(190)
+
+            readonly property real gap: Style.space(3)
+            readonly property real barWidth:
+              Math.max(1, (width - gap * (root.barCount - 1)) / root.barCount)
+
+            Repeater {
+              model: root.barCount
+
+              Item {
+                required property int index
+                width: bars.barWidth
+                height: bars.height
+                x: index * (bars.barWidth + bars.gap)
+
+                readonly property real level: root.levels[index] || 0
+                readonly property real peak: root.peaks[index] || 0
+                readonly property color tone:
+                  root.spectrumColour(index / Math.max(1, root.barCount - 1))
+
+                // The bar itself, growing from the baseline.
+                Rectangle {
+                  anchors.bottom: parent.bottom
+                  width: parent.width
+                  radius: width / 2
+                  color: parent.tone
+                  height: Math.max(Style.space(3), parent.level * bars.height)
+                  Behavior on height {
+                    NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                  }
+                }
+
+                // Falloff marker, the one thing the glyph spectra have that a
+                // plain bar chart does not.
+                Rectangle {
+                  width: parent.width
+                  height: Math.max(1, Style.space(2))
+                  radius: height / 2
+                  color: parent.tone
+                  opacity: 0.55
+                  y: Math.max(0, bars.height - parent.peak * bars.height - height)
+                  Behavior on y {
+                    NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                  }
+                }
+              }
+            }
+          }
+
+          // Position, drawn the way PanelSlider draws a track.
+          Item {
+            width: parent.width
+            height: Style.spacing.controlHeight
+            opacity: root.trackLength > 0 ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 200 } }
+
+            Text {
+              id: elapsed
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.clock(root.trackPosition)
+              color: Qt.darker(Color.foreground, 1.4)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              id: total
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.clock(root.trackLength)
+              color: Qt.darker(Color.foreground, 1.4)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
+
+            Rectangle {
+              id: track
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.left: elapsed.right
+              anchors.right: total.left
+              anchors.leftMargin: Style.spacing.controlGap
+              anchors.rightMargin: Style.spacing.controlGap
+              height: Math.max(4, Math.round(Style.spacing.controlHeight * 0.11))
+              radius: height / 2
+              color: Util.alpha(Color.foreground, 0.2)
+
+              Rectangle {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                height: parent.height
+                radius: parent.radius
+                color: Color.accent
+                width: parent.width * (root.trackLength > 0
+                  ? Math.max(0, Math.min(1, root.trackPosition / root.trackLength)) : 0)
+                Behavior on width {
+                  NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
+              }
+            }
+          }
+        }
+      }
+
       Column {
         id: content
+        visible: root.style !== "system"
         anchors.centerIn: parent
         spacing: Style.space(48)
 

@@ -203,8 +203,8 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 
 | Key | Values | Default | What it does |
 |---|---|---|---|
-| `style` | `ascii`, `blocks`, `dots` | `dots` | which alphabet draws the cover |
-| `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots` | `auto` | how the spectrum is drawn |
+| `style` | `ascii`, `blocks`, `dots`, `system` | `dots` | which alphabet draws the cover — or `system`, which uses none |
+| `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots`, `native` | `auto` | how the spectrum is drawn |
 | `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 | `showWhenIdle` | `true`, `false` | `true` | whether idling into the screensaver hands over to this one |
@@ -218,6 +218,20 @@ times as densely and turned into a one-bit image — Floyd–Steinberg dithered,
 its own contrast range opened out first, then coloured per cell from the dots
 that are actually lit. A newspaper halftone, in a terminal.
 
+**`system`** speaks no alphabet at all. It borrows the shell's own popup
+language — the way the audio, network and bluetooth panels are drawn — and puts
+the same card on screen at screensaver size: a `BorderSurface` over the
+background at 0.97 with the `popups` border spec, a hero row of the cover as a
+real image beside the labels, a separator, a section header, bars as rounded
+rectangles, and a position track built the way `PanelSlider` builds one. Every
+dimension goes through `Style.space()` and every colour through the `Color`
+tokens, so it follows the theme's rounding, spacing and font scale the way the
+rest of the desktop does.
+
+<p align="center">
+  <img src="docs/system.png" width="70%" alt="the system preset: an Omarchy panel card at screensaver size">
+</p>
+
 The preset carries the whole screen: on `ascii` the falloff markers become `-`
 and `_`, the progress rule becomes `---o---`, and the spectrum switches
 alphabet too — `spectrum: auto` means `bars` under `blocks` and `ascii` under
@@ -230,6 +244,7 @@ alphabet too — `spectrum: auto` means `bars` under `blocks` and `ascii` under
 | `density` | `. , : ; = + * #` | the other ASCII tradition: weight of ink, not position. Reads as a heat map |
 | `wave` | `_ / \ \|` | a contour tracing the top of the spectrum, risers drawn in so the line never breaks — an oscilloscope rather than a bar chart |
 | `dots` | `⣀⣤⣶⣿` / `⠉⠛⠿⣿` | braille packs four rows into a cell, the trick btop and gotop use for graphs smoother than the terminal grid allows. Reads as an LED equaliser |
+| `native` | rounded rectangles | not text at all: QML primitives with the shell's own easing, for the `system` style. Cheapest of the six, since nothing has to be laid out as rich text |
 
 Both are watched live — edit `shell.json` and the screen is redrawn without a
 restart.

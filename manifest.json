@@ -28,11 +28,12 @@
         "options": [
           "ascii",
           "blocks",
-          "dots"
+          "dots",
+          "system"
         ],
         "default": "dots",
         "label": "Style preset",
-        "description": "ascii draws the cover with a 70-glyph letter ramp, blocks with shaded block characters, dots with dithered braille."
+        "description": "ascii draws the cover with a 70-glyph letter ramp, blocks with shaded block characters, dots with dithered braille, system with the shell's own panel language -- a real image and rectangles instead of text."
       },
       {
         "key": "spectrum",
@@ -43,11 +44,12 @@
           "ascii",
           "density",
           "wave",
-          "dots"
+          "dots",
+          "native"
         ],
         "default": "auto",
         "label": "Spectrum",
-        "description": "How the spectrum is drawn. auto follows the style preset: bars for blocks, ascii for ascii, dots for dots."
+        "description": "How the spectrum is drawn. auto follows the style preset: bars for blocks, ascii for ascii, dots for dots, native for system."
       },
       {
         "key": "colors",
