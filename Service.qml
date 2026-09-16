@@ -71,7 +71,7 @@ Scope {
   // braille -- eight dots to a cell, so the cover is dithered rather than
   // ramped. "system" speaks no alphabet at all: it borrows the shell's own
   // panel language, the way the audio and network popups are drawn.
-  readonly property var styles: ["ascii", "blocks", "dots", "system"]
+  readonly property var styles: ["ascii", "blocks", "dots", "system", "rain"]
   readonly property string style: {
     const want = String(root.settings.style || "")
     return root.styles.indexOf(want) !== -1 ? want : "dots"
@@ -120,9 +120,22 @@ Scope {
   }
   readonly property bool onLightBackdrop: root.isLight(root.backdropColor)
 
+  // How often the rain style strikes.
+  readonly property var lightningModes: ["auto", "rare", "often", "off"]
+  readonly property string lightningMode: {
+    const want = String(root.settings.lightning || "")
+    return root.lightningModes.indexOf(want) !== -1 ? want : "auto"
+  }
+
   // Whether idling into the screensaver hands over to this one. Off, it only
   // ever appears when asked for -- the menu entry, or the IPC command.
   readonly property bool showWhenIdle: root.settings.showWhenIdle !== false
+
+  // The rain scene draws the cover on the same character grid as the weather,
+  // and that grid is coarser than the one the other presets use -- so the same
+  // column count would fill the screen. Draw it narrower there.
+  readonly property int sceneArtWidth: root.style === "rain"
+    ? Math.min(root.artWidth, 58) : root.artWidth
 
   readonly property int artWidth: {
     const width = parseInt(root.settings.artWidth)
@@ -180,6 +193,7 @@ Scope {
     case "dots":   return "dots"
     case "blocks": return "bars"
     case "system": return "native"
+    case "rain":   return "none"
     default:       return "ascii"
     }
   }
@@ -694,6 +708,17 @@ Scope {
       return name
     }
 
+    // omarchy-shell music-saver lightning auto|rare|often|off
+    function lightning(name: string): string {
+      if (!name)
+        return root.lightningMode
+      if (root.lightningModes.indexOf(name) === -1)
+        return "unknown lightning: " + name + " (" + root.lightningModes.join(", ") + ")"
+      if (!root.writeSetting("lightning", name))
+        return "could not write shell.json"
+      return name
+    }
+
     // omarchy-shell music-saver colors theme|accent|cover
     function colors(name: string): string {
       if (!name)
@@ -760,7 +785,7 @@ Scope {
     id: artRender
     command: ["python3", Quickshell.env("HOME")
       + "/.config/omarchy/plugins/mrhogun.music-saver/bin/art.py", root.artUrl,
-      String(root.artWidth), root.style,
+      String(root.sceneArtWidth), root.style === "rain" ? "dots" : root.style,
       root.onLightBackdrop ? "light" : "dark"]
     stdout: StdioCollector {
       waitForEnd: true
@@ -827,7 +852,7 @@ Scope {
   // redraw the same track, so key the cache on everything the drawing depends
   // on rather than on the url alone.
   readonly property string artSignature: root.artUrl + "|" + root.style + "|"
-    + root.artWidth + "|" + (root.onLightBackdrop ? "light" : "dark")
+    + root.sceneArtWidth + "|" + (root.onLightBackdrop ? "light" : "dark")
 
   function refreshArt() {
     // Track changes can blank the url for a moment, and a pause used to blank it
@@ -1196,9 +1221,33 @@ Scope {
         }
       }
 
+      // The rain preset: the cover stops being the picture and becomes the
+      // thing the weather happens to.
+      RainScene {
+        anchors.fill: parent
+        anchors.bottomMargin: Style.space(18)
+        visible: root.style === "rain"
+        running: root.showing && root.style === "rain"
+        levels: root.levels
+        overallLevel: root.overallLevel
+        bands: root.barCount
+        // Braille for the cover, plain ASCII for the water: two alphabets so
+        // the rain reads as something falling in front of a picture rather
+        // than as more of the picture.
+        style: "ascii"
+        toneAt: function(t) { return root.spectrumColour(t) }
+        dimColour: Color.muted
+        artHtml: root.artHtml
+        artCols: root.sceneArtWidth
+        coverOpacity: 0.7
+        lightning: root.lightningMode
+        title: root.heldTitle
+        artist: root.heldArtist
+      }
+
       Column {
         id: content
-        visible: root.style !== "system"
+        visible: root.style !== "system" && root.style !== "rain"
         anchors.centerIn: parent
         spacing: Style.space(48)
 

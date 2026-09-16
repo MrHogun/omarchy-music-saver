@@ -211,10 +211,11 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 
 | Key | Values | Default | What it does |
 |---|---|---|---|
-| `style` | `ascii`, `blocks`, `dots`, `system` | `dots` | which alphabet draws the cover — or `system`, which uses none |
+| `style` | `ascii`, `blocks`, `dots`, `system`, `rain` | `dots` | which alphabet draws the cover — or `system` and `rain`, which change the scene |
 | `spectrum` | `auto`, `bars`, `ascii`, `density`, `wave`, `dots`, `native` | `auto` | how the spectrum is drawn |
 | `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from (the `system` style ignores it) |
 | `backdrop` | `auto`, `theme`, `dark` | `auto` | what the art is drawn on |
+| `lightning` | `auto`, `rare`, `often`, `off` | `auto` | how often the `rain` style strikes |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 | `showWhenIdle` | `true`, `false` | `true` | whether idling into the screensaver hands over to this one |
 
@@ -236,7 +237,8 @@ that are actually lit. A newspaper halftone, in a terminal.
   <em><code>dots</code> &nbsp;·&nbsp; <code>ascii</code> &nbsp;·&nbsp; <code>blocks</code></em>
 </p>
 
-**`system`** speaks no alphabet at all. It borrows the shell's own popup
+**`rain`** changes the scene rather than the alphabet — see [Rain](#rain)
+below. **`system`** speaks no alphabet at all. It borrows the shell's own popup
 language — the way the audio, network and bluetooth panels are drawn — and puts
 the same card on screen at screensaver size: a `BorderSurface` over the
 background at 0.97 with the `popups` border spec, a hero row of the cover as a
@@ -287,6 +289,47 @@ restart.
 <p align="center">
   <em>the same cover with <code>spectrum: wave</code> — a contour instead of bars</em>
 </p>
+
+### Rain
+
+<p align="center">
+  <img src="docs/rain.png" width="78%" alt="the rain style: a storm the cover stands in">
+</p>
+
+`style: rain` is not another alphabet for the same picture. The cover stops
+being the picture and becomes the thing the weather happens to: rain falls the
+full width of the screen, lands on the cover and runs down its face, drips off
+the bottom edge onto the caption below, and collects in a waterline along the
+floor.
+
+It is a visualiser, not a wallpaper. **A column of the screen belongs to a band
+of the spectrum** — bass on the left, treble on the right — so a bassline rains
+on one side and a hi-hat spits on the other, and a drizzle everywhere keeps the
+quiet half of the spectrum from becoming a desert. The puddles are the same
+spectrum with a long memory: each column fills where drops land and dries at
+3.5% a frame, so the floor keeps the shape of the last half-minute.
+
+Three references, and what each one gave:
+
+- [`ttfx thunderstorm`](https://github.com/ChrisBuilds/terminaltexteffects) —
+  the effect Omarchy's own screensaver can already play. Its bolt is drawn as
+  line segments rather than a ladder of symbols, and it throws sparks of
+  `* . '` where the strike lands; both are borrowed here.
+- [terminal-rain-lightning](https://github.com/rmaake1/terminal-rain-lightning) —
+  a list of drops each with its own speed and glyph, and the insight that a
+  drizzle becomes a storm by changing two numbers rather than two systems.
+- [ASCII Rain Drops](https://www.asciiart.eu/animations/ascii-rain-drops) —
+  rings that expand from every impact and fade as they go, which is what makes
+  water read as water.
+
+**Lightning is an onset, not a dice roll.** Each frame's jump in loudness is
+compared against a running average of recent jumps — the rule onset detectors
+use, so it adapts to a quiet track as readily as a loud one — with a floor
+underneath it so silence cannot trigger on its own noise, and a cooldown over
+the top. The cooldown is what makes it weather rather than a strobe: music
+offers a dozen onsets a minute and a storm that answered all of them would be
+ridiculous. Measured against real playback, `auto` lands about one strike every
+13 seconds, `rare` every 26, `often` every 6.
 
 ### Backdrop
 
@@ -377,6 +420,13 @@ Past the settings above, the rest is source-level:
   turns the whole thing into a microphone visualiser that looks like it works.
 - Rich text with one span per cell is not free; the cover is redrawn only when
   the track changes, never per frame.
+- **What it costs.** On a 4K display, measured over 12 seconds on a fresh
+  shell: `system` 10% of one core, `blocks` 15%, `dots` 17%, `rain` 30%.
+  Hidden, it is 0.1% and the analyser is not running at all. `rain` is the
+  expensive one because it animates the whole screen rather than a band of it;
+  everything it draws is built from the drops rather than from the grid, and
+  the colour comes from three flat text layers rather than a mask over a
+  gradient, which on a 4K panel cost more than the rest of the scene together.
 - Omarchy's own idle service keeps running. This overlay sits on the overlay
   layer above it, so the stock screensaver may still be started underneath.
 

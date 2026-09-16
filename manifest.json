@@ -20,7 +20,8 @@
       "colors": "cover",
       "artWidth": 72,
       "showWhenIdle": true,
-      "backdrop": "auto"
+      "backdrop": "auto",
+      "lightning": "auto"
     },
     "schema": [
       {
@@ -30,11 +31,12 @@
           "ascii",
           "blocks",
           "dots",
-          "system"
+          "system",
+          "rain"
         ],
         "default": "dots",
         "label": "Style preset",
-        "description": "ascii draws the cover with a 70-glyph letter ramp, blocks with shaded block characters, dots with dithered braille, system with the shell's own panel language -- a real image and rectangles instead of text."
+        "description": "ascii draws the cover with a 70-glyph letter ramp, blocks with shaded block characters, dots with dithered braille, system with the shell's own panel language, rain turns the screen into weather the cover stands in."
       },
       {
         "key": "spectrum",
@@ -75,6 +77,19 @@
         "default": "auto",
         "label": "Backdrop",
         "description": "auto keeps the theme's background while it is dark and falls back to black once the theme turns light; theme always follows the shell background, and the art inverts its polarity on a light one; dark is always black, the way Omarchy's own screensaver pins its terminal."
+      },
+      {
+        "key": "lightning",
+        "type": "enum",
+        "options": [
+          "auto",
+          "rare",
+          "often",
+          "off"
+        ],
+        "default": "auto",
+        "label": "Lightning",
+        "description": "How often the rain style strikes. A strike is an onset in the music, not a dice roll; this sets how strong an onset has to be and how long the storm waits afterwards -- about one strike every 13s on auto, 26s on rare, 6s on often."
       },
       {
         "key": "artWidth",
