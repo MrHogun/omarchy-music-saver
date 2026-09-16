@@ -14,7 +14,7 @@ yourself.
 ![kind](https://img.shields.io/badge/omarchy-plugin-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 <p align="center">
-  <img src="preview.png" width="78%" alt="the four style presets, one track, side by side">
+  <img src="preview.png" width="86%" alt="the five style presets, one track, side by side">
 </p>
 
 ---
@@ -68,10 +68,31 @@ position it already had, so any new id lands at the bottom of its submenu —
 under Shutdown, in this case. A child is the only place next to Screensaver
 that an extension can reach.
 
-Remove it with `./install.sh uninstall` (or `omarchy plugin remove
-mrhogun.music-saver`, which leaves the menu block behind — run the script's
-uninstall first). The script takes exactly that block back out; the stock row
-returns on its own, because it was never edited.
+### Updating
+
+```bash
+omarchy plugin update mrhogun.music-saver
+```
+
+It fetches, shows you the diff, asks, fast-forwards only (so a local edit of
+yours stops the update rather than being overwritten), re-runs the manifest
+validation and rolls the checkout back if that fails, then rescans — no shell
+restart. Your settings are untouched by any of it: they live in `shell.json`,
+not in the plugin directory.
+
+Installed from the marketplace rather than by URL, Plugin Manager offers an
+update only once the marketplace has verified the newer commit, so a version
+can be here and not there yet.
+
+### Removing
+
+```bash
+./install.sh uninstall
+```
+
+Or `omarchy plugin remove mrhogun.music-saver`, which leaves the menu block
+behind — run the script's uninstall first. The script takes exactly that block
+back out; the stock row returns on its own, because it was never edited.
 
 Needs `python3`, plus `pw-cat` (PipeWire) for the spectrum and `ffmpeg` /
 `ffprobe` for the cover — all of which a normal Omarchy install already has. It
