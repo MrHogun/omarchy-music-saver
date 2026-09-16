@@ -21,7 +21,8 @@
       "artWidth": 72,
       "showWhenIdle": true,
       "backdrop": "auto",
-      "lightning": "auto"
+      "lightning": "auto",
+      "screens": "extend"
     },
     "schema": [
       {
@@ -90,6 +91,18 @@
         "default": "auto",
         "label": "Lightning",
         "description": "How often the rain style strikes. A strike is an onset in the music, not a dice roll; this sets how strong an onset has to be and how long the storm waits afterwards -- about one strike every 13s on auto, 26s on rare, 6s on often."
+      },
+      {
+        "key": "screens",
+        "type": "enum",
+        "options": [
+          "extend",
+          "mirror",
+          "primary"
+        ],
+        "default": "extend",
+        "label": "Other screens",
+        "description": "extend puts the scene on the focused screen and the shell's own panel card on the rest, so two monitors are not the same picture twice; mirror runs the scene everywhere; primary leaves the other screens dark."
       },
       {
         "key": "artWidth",

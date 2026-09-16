@@ -120,6 +120,20 @@ Scope {
   }
   readonly property bool onLightBackdrop: root.isLight(root.backdropColor)
 
+  // What the other screens do while one of them has the scene.
+  //
+  //   extend  -- the scene on the screen that has focus, and the shell's own
+  //              panel card on the rest: the same track, told differently, so
+  //              two monitors are not the same picture twice
+  //   mirror  -- every screen runs the scene (the honest cost of that is in
+  //              the README)
+  //   primary -- one screen has the scene, the rest are simply dark
+  readonly property var screenModes: ["extend", "mirror", "primary"]
+  readonly property string screenMode: {
+    const want = String(root.settings.screens || "")
+    return root.screenModes.indexOf(want) !== -1 ? want : "extend"
+  }
+
   // How often the rain style strikes.
   readonly property var lightningModes: ["auto", "rare", "often", "off"]
   readonly property string lightningMode: {
@@ -708,6 +722,17 @@ Scope {
       return name
     }
 
+    // omarchy-shell music-saver screens extend|mirror|primary
+    function screens(name: string): string {
+      if (!name)
+        return root.screenMode
+      if (root.screenModes.indexOf(name) === -1)
+        return "unknown screens mode: " + name + " (" + root.screenModes.join(", ") + ")"
+      if (!root.writeSetting("screens", name))
+        return "could not write shell.json"
+      return name
+    }
+
     // omarchy-shell music-saver lightning auto|rare|often|off
     function lightning(name: string): string {
       if (!name)
@@ -830,10 +855,15 @@ Scope {
   // Dip out, swap, come back. Cross-fading meant two rich-text blocks of about
   // eight hundred spans each laid out at once, and that lands as a stutter on
   // every track change -- which is exactly when it is most visible.
+  //
+  // The animation drives a property here rather than an item in the window,
+  // because there is one window per screen now and no single item to point at.
+  property real artOpacity: 1
+
   SequentialAnimation {
     id: artFade
     NumberAnimation {
-      target: artCurrent; property: "opacity"
+      target: root; property: "artOpacity"
       to: 0; duration: 220; easing.type: Easing.InQuad
     }
     ScriptAction {
@@ -843,7 +873,7 @@ Scope {
       }
     }
     NumberAnimation {
-      target: artCurrent; property: "opacity"
+      target: root; property: "artOpacity"
       to: 1; duration: 320; easing.type: Easing.OutQuad
     }
   }
@@ -911,19 +941,46 @@ Scope {
     }
   }
 
-  PanelWindow {
-    id: saver
-    visible: root.showing
-    anchors { top: true; bottom: true; left: true; right: true }
-    color: root.backdropColor
-    WlrLayershell.namespace: "omarchy-music-saver"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
+  // One window per screen. The stock screensaver does the same thing the long
+  // way round -- omarchy-launch-screensaver walks `hyprctl monitors` and opens
+  // a terminal on each -- and a screensaver that leaves the second monitor
+  // showing your desktop is not a screensaver.
+  //
+  // Only the first screen takes keyboard focus. Wayland hands keys to the layer
+  // that asked for them exclusively, so one is enough, and two layers both
+  // demanding exclusivity is a fight with no winner.
+  Variants {
+    model: Quickshell.screens
+
+    PanelWindow {
+      id: saver
+      required property var modelData
+      // What this window shows. Only one screen runs the scene unless asked to
+      // mirror; the others carry the card, which is a different way of saying
+      // the same track rather than a second copy of it.
+      readonly property bool showsScene: primaryScreen || root.screenMode === "mirror"
+      readonly property bool showsCard:
+        (root.style === "system" && showsScene)
+        || (!primaryScreen && root.screenMode === "extend" && root.style !== "system")
+      readonly property bool showsQuiet:
+        !primaryScreen && root.screenMode === "extend" && root.style === "system"
+
+      readonly property bool primaryScreen:
+        Quickshell.screens.length === 0 || Quickshell.screens[0] === modelData
+
+      screen: modelData
+      visible: root.showing
+      anchors { top: true; bottom: true; left: true; right: true }
+      color: root.backdropColor
+      WlrLayershell.namespace: "omarchy-music-saver"
+      WlrLayershell.layer: WlrLayer.Overlay
+      WlrLayershell.keyboardFocus: root.showing && primaryScreen
+        ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+      exclusionMode: ExclusionMode.Ignore
 
     Item {
       anchors.fill: parent
-      focus: root.showing
+      focus: root.showing && saver.primaryScreen
 
       // The stock screensaver exits the moment its window is no longer the
       // focused one -- `! screensaver_in_focus` in its loop -- so that anything
@@ -933,7 +990,7 @@ Scope {
       onActiveFocusChanged: {
         if (activeFocus)
           focusGuard.stop()
-        else if (root.showing)
+        else if (root.showing && saver.primaryScreen)
           focusGuard.restart()
       }
 
@@ -975,7 +1032,7 @@ Scope {
       // than like a terminal.
       BorderSurface {
         id: card
-        visible: root.style === "system"
+        visible: saver.showsCard
         anchors.centerIn: parent
         // A panel is sized for a corner of the screen; a screensaver has the
         // whole of it. Everything inside is multiplied by how much bigger this
@@ -1029,6 +1086,7 @@ Scope {
                 anchors.centerIn: parent
                 visible: root.artUrl === ""
                 text: "\u{f075a}"
+                textFormat: Text.PlainText
                 color: Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: Math.round(Style.font.displayLarge * card.k)
@@ -1073,6 +1131,7 @@ Scope {
 
           Text {
             text: "SPECTRUM"
+            textFormat: Text.PlainText
             color: Qt.darker(Color.foreground, 1.4)
             font.family: Style.font.family
             font.pixelSize: Math.round(Style.font.caption * card.k)
@@ -1098,7 +1157,7 @@ Scope {
             // the top. Sixteen rectangles for the whole spectrum rather than
             // sixteen per column, and the meter reads as an LED ladder.
             Repeater {
-              model: bars.segments
+              model: saver.showsCard ? bars.segments : 0
 
               Rectangle {
                 required property int index
@@ -1111,7 +1170,7 @@ Scope {
             }
 
             Repeater {
-              model: root.barCount
+              model: saver.showsCard ? root.barCount : 0
 
               Item {
                 required property int index
@@ -1178,6 +1237,7 @@ Scope {
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               text: root.clock(root.trackPosition)
+              textFormat: Text.PlainText
               color: Qt.darker(Color.foreground, 1.4)
               font.family: Style.font.family
               font.pixelSize: Math.round(Style.font.caption * card.k)
@@ -1188,6 +1248,7 @@ Scope {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               text: root.clock(root.trackLength)
+              textFormat: Text.PlainText
               color: Qt.darker(Color.foreground, 1.4)
               font.family: Style.font.family
               font.pixelSize: Math.round(Style.font.caption * card.k)
@@ -1221,13 +1282,57 @@ Scope {
         }
       }
 
+      // The screens that are not driving the scene get a quiet version of it:
+      // the cover and the track, no spectrum and no weather. A screensaver has
+      // to cover every screen, but running the animation on all of them costs
+      // three times what one screen costs -- two 4K layers to composite and two
+      // sets of text to lay out every frame -- to show the same thing twice.
+      Column {
+        visible: saver.showsQuiet
+        anchors.centerIn: parent
+        spacing: Style.space(36)
+
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: root.artHtml
+          textFormat: Text.RichText
+          opacity: root.artOpacity
+          font.family: Style.fontFamily
+          font.pixelSize: 15
+          lineHeight: 0.78
+          horizontalAlignment: Text.AlignHCenter
+        }
+
+        Column {
+          anchors.horizontalCenter: parent.horizontalCenter
+          spacing: Style.space(6)
+
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: root.heldTitle
+            textFormat: Text.PlainText
+            color: Color.foreground
+            font.family: Style.fontFamily
+            font.pixelSize: 20
+          }
+          Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: root.heldArtist
+            textFormat: Text.PlainText
+            color: Color.muted
+            font.family: Style.fontFamily
+            font.pixelSize: 16
+          }
+        }
+      }
+
       // The rain preset: the cover stops being the picture and becomes the
       // thing the weather happens to.
       RainScene {
         anchors.fill: parent
         anchors.bottomMargin: Style.space(18)
-        visible: root.style === "rain"
-        running: root.showing && root.style === "rain"
+        visible: root.style === "rain" && saver.showsScene
+        running: root.showing && root.style === "rain" && saver.showsScene
         levels: root.levels
         overallLevel: root.overallLevel
         bands: root.barCount
@@ -1247,7 +1352,7 @@ Scope {
 
       Column {
         id: content
-        visible: root.style !== "system" && root.style !== "rain"
+        visible: saver.showsScene && root.style !== "system" && root.style !== "rain"
         anchors.centerIn: parent
         spacing: Style.space(48)
 
@@ -1264,7 +1369,7 @@ Scope {
           Text {
             id: artCurrent
             text: root.artHtml
-            opacity: 1
+            opacity: root.artOpacity
             textFormat: Text.RichText
             font.family: Style.fontFamily
             font.pixelSize: 15
@@ -1289,7 +1394,8 @@ Scope {
 
             Text {
               id: upperText
-              text: root.frame.upper
+              text: saver.showsScene ? root.frame.upper : ""
+              textFormat: Text.PlainText
               font.family: Style.fontFamily
               font.pixelSize: 20
               lineHeight: 0.92
@@ -1331,7 +1437,8 @@ Scope {
 
             Text {
               id: lowerText
-              text: root.frame.lower
+              text: saver.showsScene ? root.frame.lower : ""
+              textFormat: Text.PlainText
               font.family: Style.fontFamily
               font.pixelSize: 20
               lineHeight: 0.92
@@ -1355,6 +1462,7 @@ Scope {
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.scrambled(root.heldTitle)
+            textFormat: Text.PlainText
             color: Color.foreground
             font.family: Style.fontFamily
             font.pixelSize: 20
@@ -1362,6 +1470,7 @@ Scope {
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.scrambled(root.heldArtist)
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: Style.fontFamily
             font.pixelSize: 16
@@ -1375,18 +1484,21 @@ Scope {
 
             Text {
               text: root.clock(root.trackPosition)
+              textFormat: Text.PlainText
               color: Color.muted
               font.family: Style.fontFamily
               font.pixelSize: 14
             }
             Text {
-              text: root.progressLine(48)
+              text: saver.showsScene ? root.progressLine(48) : ""
+              textFormat: Text.PlainText
               color: Color.accent
               font.family: Style.fontFamily
               font.pixelSize: 14
             }
             Text {
               text: root.clock(root.trackLength)
+              textFormat: Text.PlainText
               color: Color.muted
               font.family: Style.fontFamily
               font.pixelSize: 14
@@ -1395,5 +1507,6 @@ Scope {
         }
       }
     }
+  }
   }
 }

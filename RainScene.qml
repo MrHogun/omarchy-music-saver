@@ -445,6 +445,7 @@ Item {
       Text {
         required property int index
         text: scene.painted.rain.length > index ? scene.painted.rain[index] : ""
+        textFormat: Text.PlainText
         color: scene.toneAt((index + 0.5) / scene.colourBands)
         opacity: 0.8
         font.family: Style.fontFamily
@@ -457,6 +458,7 @@ Item {
     // flash, and it reads as one only if it is drawn white.
     Text {
       text: scene.painted.bolt
+      textFormat: Text.PlainText
       color: "#ffffff"
       font.family: Style.fontFamily
       font.pixelSize: fm.font.pixelSize
@@ -480,6 +482,7 @@ Item {
       x: scene.artLeft * scene.cellWidth
       y: scene.artTop * scene.cellHeight
       text: scene.painted.cover
+      textFormat: Text.PlainText
       color: Color.foreground
       opacity: scene.coverOpacity
       font.family: Style.fontFamily
@@ -498,6 +501,7 @@ Item {
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
         text: scene.title
+        textFormat: Text.PlainText
         color: Color.foreground
         font.family: Style.fontFamily
         font.pixelSize: 20
@@ -505,6 +509,7 @@ Item {
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
         text: scene.artist
+        textFormat: Text.PlainText
         color: Color.muted
         font.family: Style.fontFamily
         font.pixelSize: 16
@@ -516,6 +521,7 @@ Item {
       x: scene.labelLeft * scene.cellWidth
       y: scene.labelTop * scene.cellHeight
       text: scene.painted.label
+      textFormat: Text.PlainText
       color: Color.foreground
       opacity: scene.coverOpacity
       font.family: Style.fontFamily
@@ -527,6 +533,7 @@ Item {
     Text {
       y: scene.poolRow * scene.cellHeight
       text: scene.painted.water
+      textFormat: Text.PlainText
       color: scene.dimColour
       font.family: Style.fontFamily
       font.pixelSize: fm.font.pixelSize

@@ -237,6 +237,7 @@ merge layers. This plugin is a service, so its entry lives in `plugins[]`:
 | `colors` | `theme`, `accent`, `cover` | `cover` | where the spectrum takes its colour from (the `system` style ignores it) |
 | `backdrop` | `auto`, `theme`, `dark` | `auto` | what the art is drawn on |
 | `lightning` | `auto`, `rare`, `often`, `off` | `auto` | how often the `rain` style strikes |
+| `screens` | `extend`, `mirror`, `primary` | `extend` | what the screens without the scene do |
 | `artWidth` | 24–120 | `72` | cover width in characters |
 | `showWhenIdle` | `true`, `false` | `true` | whether idling into the screensaver hands over to this one |
 
@@ -352,6 +353,29 @@ offers a dozen onsets a minute and a storm that answered all of them would be
 ridiculous. Measured against real playback, `auto` lands about one strike every
 13 seconds, `rare` every 26, `often` every 6.
 
+### Screens
+
+A screensaver that leaves your second monitor showing the desktop is not a
+screensaver, so there is one window per screen — the stock one does the same
+thing the long way round, walking `hyprctl monitors` and opening a terminal on
+each. Only the first screen takes keyboard focus: Wayland hands keys to the
+layer that asked for them exclusively, and two layers both demanding
+exclusivity is a fight with no winner.
+
+Showing the same scene twice is the obvious thing and the wrong one — the same
+picture on both monitors, at twice the cost. So `extend` puts the scene on the
+screen that has focus and the shell's own panel card on the rest: the cover as
+an image, the track, a spectrum and a position track. The same music, told a
+different way. (When the style already *is* `system`, the card would be a
+repeat, so those screens show the cover and the track quietly instead.)
+`mirror` runs the scene everywhere, and `primary` leaves the other screens
+dark.
+
+Invisible is not free, by the way: a `Text` that nobody can see still lays
+itself out when its binding fires. The windows that are not running the scene
+are handed empty strings and empty models rather than hidden items, which is
+the difference between 33% of a core and 14%.
+
 ### Backdrop
 
 Omarchy's own screensaver pins its terminal to black whatever the theme is
@@ -441,9 +465,10 @@ Past the settings above, the rest is source-level:
   turns the whole thing into a microphone visualiser that looks like it works.
 - Rich text with one span per cell is not free; the cover is redrawn only when
   the track changes, never per frame.
-- **What it costs.** On a 4K display, measured over 12 seconds on a fresh
+- **What it costs.** On one 4K display, measured over 12 seconds on a fresh
   shell: `system` 10% of one core, `blocks` 15%, `dots` 17%, `rain` 30%.
-  Hidden, it is 0.1% and the analyser is not running at all. `rain` is the
+  Across two 4K displays with `screens: extend`: `system` 13%, `dots` 14%,
+  `rain` 27%. Hidden, it is 0.1% and the analyser is not running at all. `rain` is the
   expensive one because it animates the whole screen rather than a band of it;
   everything it draws is built from the drops rather than from the grid, and
   the colour comes from three flat text layers rather than a mask over a
