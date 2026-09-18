@@ -502,6 +502,16 @@ Scope {
   readonly property string artist: player ? (player.trackArtist || "") : ""
   readonly property string artUrl: player ? (player.trackArtUrl || "") : ""
 
+  // MPRIS metadata is whatever the player chose to put in it, and trackArtUrl
+  // is a URL rather than a path. A file:// one is a file on this machine that
+  // the player has already downloaded; anything else -- http, data:, a stream
+  // -- would have the shell fetch and decode a stranger's bytes inside the
+  // long-lived shell process, with no timeout, no size limit and Qt's image
+  // decoders on the other end. Only the local case is handed to an Image; the
+  // rest goes to the helper, which fetches under limits it can enforce.
+  readonly property bool artIsLocal: String(root.artUrl).indexOf("file://") === 0
+  readonly property string localArtUrl: root.artIsLocal ? root.artUrl : ""
+
   // Between tracks the player reports empty metadata for a moment. Letting that
   // through empties the labels, the row collapses, and everything above it
   // jumps down and back. Keep the last real values until new ones arrive.
@@ -1078,13 +1088,13 @@ Scope {
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: false
-                source: root.artUrl
+                source: root.localArtUrl
                 visible: source !== ""
               }
 
               Text {
                 anchors.centerIn: parent
-                visible: root.artUrl === ""
+                visible: root.localArtUrl === ""
                 text: "\u{f075a}"
                 textFormat: Text.PlainText
                 color: Color.foreground

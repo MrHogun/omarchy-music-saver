@@ -22,8 +22,11 @@ Usage: art.py <path-or-url> [cols] [blocks|ascii|dots] [dark|light]
 """
 import colorsys
 import html
+import os
 import subprocess
 import sys
+import tempfile
+import urllib.request
 
 # Dark to light. Denser glyphs read as brighter areas once they are coloured.
 # Shape, not density, is what the eye reads at this size: a ramp of letters and
@@ -58,6 +61,51 @@ BRAILLE_BITS = ((0x01, 0x08), (0x02, 0x10), (0x04, 0x20), (0x40, 0x80))
 # How much taller a character cell is than it is wide. Close enough across the
 # monospace families a terminal-styled shell is likely to be using.
 CELL_ASPECT = 2.0
+
+
+# What a player hands us in `mpris:artUrl` is a URL, not a path, and the player
+# chose it -- so it can be an http one pointing anywhere. ffmpeg would happily
+# fetch that with no byte limit and whatever timeout it feels like. Remote art
+# is worth having (some players never cache it locally), so it is fetched here
+# instead, under limits this script can state: a connect/read timeout, a hard
+# ceiling on the bytes read, and a content type that has to look like an image.
+# Everything downstream then works on a local file.
+FETCH_TIMEOUT = 6          # seconds, connect and read
+FETCH_LIMIT = 8 * 1024 * 1024   # bytes
+
+
+def local_copy(url):
+    """Download a remote cover to a temp file, or return None."""
+    request = urllib.request.Request(url, headers={"User-Agent": "omarchy-music-saver"})
+    try:
+        with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT) as response:
+            kind = (response.headers.get("Content-Type") or "").split(";")[0].strip()
+            if not kind.startswith("image/"):
+                return None
+            length = response.headers.get("Content-Length")
+            if length and int(length) > FETCH_LIMIT:
+                return None
+            data = response.read(FETCH_LIMIT + 1)
+    except Exception:
+        return None
+    if not data or len(data) > FETCH_LIMIT:
+        return None
+    handle, path = tempfile.mkstemp(prefix="music-saver-art-", suffix=".img")
+    with os.fdopen(handle, "wb") as out:
+        out.write(data)
+    return path
+
+
+def resolve(url):
+    """A local path for the cover, plus whether it is ours to delete."""
+    if url.startswith("file://"):
+        return url[7:], False
+    if url.startswith("http://") or url.startswith("https://"):
+        path = local_copy(url)
+        return (path, True) if path else (None, False)
+    # Anything else -- data:, a bare path from a well-behaved player, a scheme
+    # nobody has invented yet -- is taken literally only if it exists on disk.
+    return (url, False) if os.path.exists(url) else (None, False)
 
 
 def source_shape(path):
@@ -259,9 +307,20 @@ def cover_palette(pixels, count):
 def main():
     if len(sys.argv) < 2:
         return 1
-    path = sys.argv[1]
-    if path.startswith("file://"):
-        path = path[7:]
+    path, temporary = resolve(sys.argv[1])
+    if not path:
+        return 1
+    try:
+        return draw(path)
+    finally:
+        if temporary:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+
+def draw(path):
     if len(sys.argv) > 2 and sys.argv[2] == "palette":
         count = int(sys.argv[3]) if len(sys.argv) > 3 else 5
         # 64 wide is plenty: this is a question about colour, not detail.

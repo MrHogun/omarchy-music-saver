@@ -457,6 +457,14 @@ Past the settings above, the rest is source-level:
 
 ## Known edges
 
+- **Nothing a player says reaches a decoder unchecked.** MPRIS metadata is
+  whatever the player chose to put in it, so `trackArtUrl` only reaches a QML
+  `Image` when it is a local `file://` one. A remote cover is fetched by
+  `art.py` instead, under limits it can state — a 6 second timeout, an 8 MB
+  ceiling, an `image/*` content type — into a temp file it deletes afterwards.
+  Titles and artist names go into `Text` items that all declare
+  `textFormat` explicitly; `Text.RichText` is left only on the markup this
+  plugin generates and escapes itself.
 - The analyser follows the **default sink**, captured with
   `stream.capture.sink` on the sink's own node — a sink's monitor is not a
   separate node, so asking for `<sink>.monitor` finds nothing. It also resolves
