@@ -25,8 +25,6 @@ import html
 import os
 import subprocess
 import sys
-import tempfile
-import urllib.request
 
 # Dark to light. Denser glyphs read as brighter areas once they are coloured.
 # Shape, not density, is what the eye reads at this size: a ramp of letters and
@@ -80,48 +78,25 @@ MAX_OUTPUT_BYTES = 2_000_000
 
 
 # What a player hands us in `mpris:artUrl` is a URL, not a path, and the player
-# chose it -- so it can be an http one pointing anywhere. ffmpeg would happily
-# fetch that with no byte limit and whatever timeout it feels like. Remote art
-# is worth having (some players never cache it locally), so it is fetched here
-# instead, under limits this script can state: a connect/read timeout, a hard
-# ceiling on the bytes read, and a content type that has to look like an image.
-# Everything downstream then works on a local file.
-FETCH_TIMEOUT = 6          # seconds, connect and read
-FETCH_LIMIT = 8 * 1024 * 1024   # bytes
-
-
-def local_copy(url):
-    """Download a remote cover to a temp file, or return None."""
-    request = urllib.request.Request(url, headers={"User-Agent": "omarchy-music-saver"})
-    try:
-        with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT) as response:
-            kind = (response.headers.get("Content-Type") or "").split(";")[0].strip()
-            if not kind.startswith("image/"):
-                return None
-            length = response.headers.get("Content-Length")
-            if length and int(length) > FETCH_LIMIT:
-                return None
-            data = response.read(FETCH_LIMIT + 1)
-    except Exception:
-        return None
-    if not data or len(data) > FETCH_LIMIT:
-        return None
-    handle, path = tempfile.mkstemp(prefix="music-saver-art-", suffix=".img")
-    with os.fdopen(handle, "wb") as out:
-        out.write(data)
-    return path
-
-
+# chose it. Earlier versions fetched remote covers here under a timeout and a
+# byte ceiling, but those checks happen *after* the request has left the
+# machine: a crafted metadata value could still make this session issue GETs at
+# loopback, link-local or private addresses, and redirects and DNS rebinding
+# make validating a hostname up front insufficient on its own.
+#
+# A cover is not worth that. Players cache their art locally -- that is what
+# `file://` in the metadata means -- so only local files are read, and anything
+# that would require going out on the network is refused. Nothing here opens a
+# socket.
 def resolve(url):
-    """A local path for the cover, plus whether it is ours to delete."""
+    """A local path for the cover, or None."""
     if url.startswith("file://"):
-        return url[7:], False
-    if url.startswith("http://") or url.startswith("https://"):
-        path = local_copy(url)
-        return (path, True) if path else (None, False)
-    # Anything else -- data:, a bare path from a well-behaved player, a scheme
-    # nobody has invented yet -- is taken literally only if it exists on disk.
-    return (url, False) if os.path.exists(url) else (None, False)
+        path = url[7:]
+    elif "://" in url:
+        return None          # http, https, data, anything else: not ours to fetch
+    else:
+        path = url           # a bare path from a well-behaved player
+    return path if os.path.isfile(path) else None
 
 
 def plausible(width, height):
@@ -333,17 +308,10 @@ def cover_palette(pixels, count):
 def main():
     if len(sys.argv) < 2:
         return 1
-    path, temporary = resolve(sys.argv[1])
+    path = resolve(sys.argv[1])
     if not path:
         return 1
-    try:
-        return draw(path)
-    finally:
-        if temporary:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
+    return draw(path)
 
 
 def draw(path):

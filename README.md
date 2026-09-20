@@ -457,11 +457,14 @@ Past the settings above, the rest is source-level:
 
 ## Known edges
 
-- **Nothing a player says reaches a decoder unchecked.** MPRIS metadata is
-  whatever the player chose to put in it, so `trackArtUrl` only reaches a QML
-  `Image` when it is a local `file://` one. A remote cover is fetched by
-  `art.py` instead, under limits it can state — a 6 second timeout, an 8 MB
-  ceiling, an `image/*` content type — into a temp file it deletes afterwards.
+- **Nothing a player says reaches a decoder, or the network, unchecked.** MPRIS
+  metadata is whatever the player chose to put in it, so `trackArtUrl` is used
+  only when it names a local `file://` cover the player has already downloaded.
+  Remote covers are not fetched at all: a URL from metadata is an address
+  somebody else picked, and a fetch to it is a request to loopback or a
+  link-local service away from being their errand — checks on the response
+  happen after the request has already left. Neither the plugin nor its helper
+  opens a socket.
   Titles and artist names go into `Text` items that all declare
   `textFormat` explicitly; `Text.RichText` is left only on the markup this
   plugin generates and escapes itself. The cover's *declared shape* is checked

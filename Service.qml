@@ -503,12 +503,12 @@ Scope {
   readonly property string artUrl: player ? (player.trackArtUrl || "") : ""
 
   // MPRIS metadata is whatever the player chose to put in it, and trackArtUrl
-  // is a URL rather than a path. A file:// one is a file on this machine that
-  // the player has already downloaded; anything else -- http, data:, a stream
-  // -- would have the shell fetch and decode a stranger's bytes inside the
-  // long-lived shell process, with no timeout, no size limit and Qt's image
-  // decoders on the other end. Only the local case is handed to an Image; the
-  // rest goes to the helper, which fetches under limits it can enforce.
+  // is a URL rather than a path. A file:// one is a file on this machine the
+  // player has already downloaded; anything else would have this session go
+  // out on the network at an address chosen by whatever is playing -- which is
+  // a request to loopback or a link-local service away from being somebody
+  // else's errand. Nothing here fetches: a cover is drawn only when it is
+  // already on disk, and the helper refuses anything else too.
   readonly property bool artIsLocal: String(root.artUrl).indexOf("file://") === 0
   readonly property string localArtUrl: root.artIsLocal ? root.artUrl : ""
 
@@ -903,6 +903,12 @@ Scope {
     + root.sceneArtWidth + "|" + (root.onLightBackdrop ? "light" : "dark")
 
   function refreshArt() {
+    // Remote art is not fetched at all, so there is nothing to run for it.
+    if (root.artUrl && !root.artIsLocal) {
+      root.artRendered = root.artSignature
+      root.artHtml = ""
+      return
+    }
     // Track changes can blank the url for a moment, and a pause used to blank it
     // for good. Neither should take the cover off the screen: hold the last one
     // until a new one has actually been drawn.
@@ -926,7 +932,7 @@ Scope {
 
   // Switching to cover colours mid-track has no new art to wait for.
   onColorSourceChanged: {
-    if (root.colorSource !== "cover" || !root.artUrl)
+    if (root.colorSource !== "cover" || !root.artUrl || !root.artIsLocal)
       return
     artColours.running = false
     Qt.callLater(function() { artColours.running = true })
