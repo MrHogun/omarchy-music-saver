@@ -826,7 +826,7 @@ Scope {
       waitForEnd: true
       onStreamFinished: {
         const drawn = text.trim()
-        if (!drawn) {
+        if (!drawn || drawn.length > root.artMarkupLimit) {
           root.artRendered = ""   // let the next change try again
           return
         }
@@ -839,6 +839,11 @@ Scope {
       }
     }
   }
+
+  // The helper caps what it draws, but the shell should not depend on a
+  // separate program's ceiling to hold: rich text is laid out in this process,
+  // and a megabyte of it would be felt here rather than there.
+  readonly property int artMarkupLimit: 2000000
 
   property string artRendered: ""
 
@@ -856,8 +861,11 @@ Scope {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        const found = text.trim().split(/\s+/).filter(c => c.charAt(0) === "#")
-        root.coverPalette = found
+        // Five hex colours is 35 bytes; anything past a line of them is not
+        // the answer to this question.
+        const found = text.length > 256
+          ? [] : text.trim().split(/\s+/).filter(c => c.charAt(0) === "#")
+        root.coverPalette = found.slice(0, 8)
       }
     }
   }

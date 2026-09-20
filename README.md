@@ -464,7 +464,11 @@ Past the settings above, the rest is source-level:
   ceiling, an `image/*` content type — into a temp file it deletes afterwards.
   Titles and artist names go into `Text` items that all declare
   `textFormat` explicitly; `Text.RichText` is left only on the markup this
-  plugin generates and escapes itself.
+  plugin generates and escapes itself. The cover's *declared shape* is checked
+  too: a few hundred bytes can claim to be 1×8000, and the rows come from that
+  ratio — so anything outside what a cover plausibly looks like is refused
+  rather than scaled, and the cell count and the markup it produces have fixed
+  ceilings on both sides of the pipe.
 - The analyser follows the **default sink**, captured with
   `stream.capture.sink` on the sink's own node — a sink's monitor is not a
   separate node, so asking for `<sink>.monitor` finds nothing. It also resolves

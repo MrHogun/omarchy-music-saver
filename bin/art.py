@@ -62,6 +62,22 @@ BRAILLE_BITS = ((0x01, 0x08), (0x02, 0x10), (0x04, 0x20), (0x40, 0x80))
 # monospace families a terminal-styled shell is likely to be using.
 CELL_ASPECT = 2.0
 
+# Everything below bounds the work a cover can ask for. The picture arrives
+# from a player's metadata, and a tiny file can declare an enormous shape: a
+# 1x8000 PNG is a few hundred bytes and would ask for eight thousand rows,
+# which is an ffmpeg frame nobody wanted and a megabyte of markup for the shell
+# to lay out. Size limits on the download do not bound that -- the declared
+# geometry does. So the geometry is checked first, and anything outside what a
+# cover plausibly looks like is refused rather than clamped into something that
+# still runs.
+MAX_COLS = 200            # the setting caps at 120; this is the script's own floor/ceiling
+MAX_ROWS = 120
+MAX_CELLS = 14000         # cols x rows actually drawn
+MAX_SOURCE_EDGE = 20000   # pixels, either dimension
+MIN_ASPECT = 0.2          # width / height
+MAX_ASPECT = 5.0
+MAX_OUTPUT_BYTES = 2_000_000
+
 
 # What a player hands us in `mpris:artUrl` is a URL, not a path, and the player
 # chose it -- so it can be an http one pointing anywhere. ffmpeg would happily
@@ -106,6 +122,16 @@ def resolve(url):
     # Anything else -- data:, a bare path from a well-behaved player, a scheme
     # nobody has invented yet -- is taken literally only if it exists on disk.
     return (url, False) if os.path.exists(url) else (None, False)
+
+
+def plausible(width, height):
+    """Is this a shape a cover could actually have?"""
+    if width <= 0 or height <= 0:
+        return False
+    if width > MAX_SOURCE_EDGE or height > MAX_SOURCE_EDGE:
+        return False
+    ratio = width / height
+    return MIN_ASPECT <= ratio <= MAX_ASPECT
 
 
 def source_shape(path):
@@ -331,15 +357,23 @@ def draw(path):
         return 0
 
     cols = int(sys.argv[2]) if len(sys.argv) > 2 else 44
+    cols = max(8, min(MAX_COLS, cols))
     style = sys.argv[3] if len(sys.argv) > 3 else "blocks"
     on_light = (sys.argv[4] if len(sys.argv) > 4 else "dark") == "light"
 
     shape = source_shape(path)
     if shape:
         width, height = shape
+        # Fail closed: a cover that claims an extreme shape is not a cover.
+        if not plausible(width, height):
+            return 1
         rows = max(1, round(cols * (height / width) / CELL_ASPECT))
     else:
+        # ffprobe could not say, so assume the shape a cover usually has.
         rows = max(1, round(cols / CELL_ASPECT))
+
+    if rows > MAX_ROWS or cols * rows > MAX_CELLS:
+        return 1
 
     # Braille subdivides the cell 2x4, and a cell is about twice as tall as it
     # is wide, so those sub-pixels come out square: the same row count, sampled
@@ -374,7 +408,13 @@ def draw(path):
                         else f'<span style="color:{run_colour}">{run_text}</span>')
         out.append("".join(line))
 
-    print("<br>".join(out))
+    drawn = "<br>".join(out)
+    # One last ceiling, on the thing the shell actually has to hold and lay
+    # out. With the caps above this cannot trigger; it is here so that a future
+    # change to them cannot quietly hand the shell a megabyte of markup.
+    if len(drawn.encode("utf-8")) > MAX_OUTPUT_BYTES:
+        return 1
+    print(drawn)
     return 0
 
 
